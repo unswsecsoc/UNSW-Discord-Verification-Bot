@@ -1,0 +1,16 @@
+aiohappyeyeballs==2.6.1
+aiohttp==3.13.3
+aiosignal==1.4.0
+attrs==25.4.0
+audioop-lts==0.2.2
+certifi==2026.1.4
+charset-normalizer==3.4.4
+discord.py==2.6.4
+frozenlist==1.8.0
+idna==3.11
+multidict==6.7.1
+propcache==0.4.1
+python-dotenv==1.2.1
+requests==2.32.5
+urllib3==2.6.3
+yarl==1.22.0
