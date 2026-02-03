@@ -1,5 +1,5 @@
 # Ours
-verification.db
+guild_dbs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
