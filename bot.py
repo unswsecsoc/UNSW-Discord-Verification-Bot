@@ -79,6 +79,22 @@ def send_email_otp(to_email, code):
 
 async def log_admin(message):
     channel = bot.get_channel(ADMIN_LOG_CHANNEL_ID)
+    
+    if channel is None:
+        try:
+            channel = await bot.fetch_channel(ADMIN_LOG_CHANNEL_ID)
+        except discord.NotFound:
+            print("Admin log channel ID is invalid.", file=sys.stderr)
+            return
+        except discord.Forbidden:
+            print("Bot does not have permission to access the admin log channel.", file=sys.stderr)
+            return
+        except discord.HTTPException as e:
+            print(f"HTTP error fetching admin channel: {e}", file=sys.stderr)
+            return
+    
+    print(type(channel))
+    
     if not isinstance(channel, discord.TextChannel):
         print("Supplied ADMIN_LOG_CHANNEL_ID is not the ID of a discord.TextChannel", file=sys.stderr)
     else:
