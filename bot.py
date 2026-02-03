@@ -92,15 +92,13 @@ async def log_admin(message):
         except discord.HTTPException as e:
             print(f"HTTP error fetching admin channel: {e}", file=sys.stderr)
             return
-    
-    print(type(channel))
-    
+        
     if not isinstance(channel, discord.TextChannel):
         print("Supplied ADMIN_LOG_CHANNEL_ID is not the ID of a discord.TextChannel", file=sys.stderr)
     else:
         await channel.send(message)
 
-# create a popup in discord upon !verify invocation
+# create a popup in discord upon /verify invocation
 class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
