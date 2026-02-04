@@ -1,7 +1,12 @@
 import os
-import sys
+import io
 import re
+import shutil
+import sys
+import csv
+import tempfile
 import time
+import json
 import sqlite3
 import random
 import string
@@ -9,6 +14,7 @@ import requests
 import discord
 from discord import app_commands
 from discord.ext import commands
+from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -278,12 +284,112 @@ class OTPView(discord.ui.View):
     async def enter_otp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(OTPModal())
 
-# ---------------- COMMAND ----------------
+def get_guild_db_path(guild: discord.Guild) -> str:
+    return f"{safe_guild_filename(guild)}"
 
+def close_guild_db(guild: discord.Guild):
+    gid = guild.id
+    conn = db_connections.pop(gid, None)
+    if conn:
+        conn.close()
+
+# ---------------- COMMAND ----------------
+# main command
 @tree.command(name="verify", description="Verify your email")
 @app_commands.guild_only()
 async def verify(interaction: discord.Interaction):
     await interaction.response.send_modal(EmailModal())
+
+
+@bot.tree.command(name="export", description="Download the verification database file")
+@app_commands.checks.has_permissions(administrator=True)
+async def export_db(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    db_path = get_guild_db_path(interaction.guild)  # type: ignore
+    
+    if not os.path.exists(db_path):
+        await interaction.followup.send("❌ Database file not found.")
+        return
+
+    filename = f"verification_backup_{interaction.guild.id}.db" # type: ignore
+
+    await interaction.followup.send(
+        content="📦 Here is the current verification database:",
+        file=discord.File(db_path, filename=filename)
+    )
+    
+@bot.tree.command(name="import", description="Replace the verification database with an uploaded backup")
+@app_commands.checks.has_permissions(administrator=True)
+async def import_db(interaction: discord.Interaction, file: discord.Attachment):
+    await interaction.response.defer(ephemeral=True)
+
+    if not file.filename.endswith(".db"):
+        await interaction.followup.send("❌ Please upload a valid .db SQLite file.")
+        return
+
+    db_path = get_guild_db_path(interaction.guild) # type: ignore
+
+    try:
+        data = await file.read()
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to read uploaded file: {e}")
+        return
+
+    # make sure we have a backup before we commit to replacing db with a broken one
+    try:
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(data)
+            temp_path = tmp.name
+    except Exception as e:
+        await interaction.followup.send(f"❌ Failed to create temp file: {e}")
+        return
+
+    try:
+        test_conn = sqlite3.connect(temp_path)
+        c = test_conn.cursor()
+
+        # basic integrity check
+        c.execute("PRAGMA integrity_check;")
+        result = c.fetchone()
+        if result[0] != "ok":
+            raise Exception("SQLite integrity check failed")
+
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
+        if not c.fetchone():
+            raise Exception("Missing required 'users' table")
+
+        test_conn.close()
+
+    except Exception as e:
+        os.remove(temp_path)
+        await interaction.followup.send(f"❌ Invalid database file: {e}")
+        return
+
+    try:
+        close_guild_db(interaction.guild)  # type: ignore
+
+        backup_path = db_path + ".backup"
+        if os.path.exists(db_path):
+            shutil.copy2(db_path, backup_path)
+
+        shutil.move(temp_path, db_path)  # atomic replace
+        get_guild_db(interaction.guild)  # type: ignore
+
+        await interaction.followup.send("✅ Database imported successfully.")
+        await log_admin(f"📥 {interaction.user} safely replaced the verification database.", interaction.guild)
+
+    except Exception as e:
+        await interaction.followup.send(f"❌ Import failed during replacement: {e}")
+
+        # Attempt rollback
+        if os.path.exists(backup_path): # type: ignore
+            shutil.move(backup_path, db_path) # type: ignore
+            get_guild_db(interaction.guild) # type: ignore
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 @bot.event
 async def on_ready():
