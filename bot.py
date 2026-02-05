@@ -1,21 +1,27 @@
 import os
-import io
 import re
-import shutil
 import sys
-import csv
-import tempfile
 import time
-import json
-import sqlite3
+import shutil
 import random
 import string
-import requests
+import logging
+import sqlite3
 import discord
+import tempfile
+import requests
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime
 from dotenv import load_dotenv
+
+os.makedirs('logs', exist_ok=True)
+logging.basicConfig(
+    filename='logs/app.log',
+    filemode='a',
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.DEBUG
+)
 
 load_dotenv()
 
@@ -48,7 +54,6 @@ def safe_guild_filename(guild: discord.Guild):
     name = re.sub(r"[^a-zA-Z0-9_-]", "_", guild.name)
     return os.path.join(DB_FOLDER, f"{name}_{guild.id}.db")
 
-
 def get_guild_db(guild: discord.Guild):
     if guild.id in db_connections:
         return db_connections[guild.id]
@@ -66,6 +71,7 @@ def get_guild_db(guild: discord.Guild):
     """)
     conn.commit()
     db_connections[guild.id] = conn
+    logging.info(f"created database for guild {guild.id}")
     return conn
 
 # Active OTP dictionary
@@ -75,14 +81,12 @@ pending_verifications = {}
 def generate_otp():
     return ''.join(random.choices(string.digits, k=OTP_LENGTH))
 
-
 def valid_email_domain(email):
     match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
     if not match:
         return False
     domain = match.group(1).lower()
     return domain in ALLOWED_DOMAINS
-
 
 def send_email_otp(to_email, code):
     return requests.post(
@@ -96,7 +100,6 @@ def send_email_otp(to_email, code):
         },
         timeout=10
     )
-
 
 async def log_admin(message, guild):
     channel = discord.utils.get(guild.text_channels, name="verification-logs")
@@ -190,9 +193,11 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         resp = send_email_otp(email, code)
 
         if resp.status_code == 200:
+            logging.info("OTP successfull sent")
             await interaction.response.send_message("📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True)
             await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
         else:
+            logging.critical(f"OTP failed to send to {interaction.user} in {interaction.guild}")
             await interaction.response.send_message("❌ Failed to send email.", ephemeral=True)
             await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
 
@@ -277,6 +282,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
         del pending_verifications[key]
 
         await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
+        logging.info(f"verified user {interaction.user}")
         await log_admin(f"✅ {interaction.user} verified with {record['email']}", interaction.guild)
 
 class OTPView(discord.ui.View):
@@ -288,6 +294,7 @@ def get_guild_db_path(guild: discord.Guild) -> str:
     return f"{safe_guild_filename(guild)}"
 
 def close_guild_db(guild: discord.Guild):
+    logging.info(f"closing guild db connection for {guild}")
     gid = guild.id
     conn = db_connections.pop(gid, None)
     if conn:
@@ -302,6 +309,7 @@ async def verify(interaction: discord.Interaction):
 
 
 @bot.tree.command(name="export", description="Download the verification database file")
+@app_commands.default_permissions(administrator=True) # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -309,17 +317,20 @@ async def export_db(interaction: discord.Interaction):
     db_path = get_guild_db_path(interaction.guild)  # type: ignore
     
     if not os.path.exists(db_path):
+        logging.warning(f"export failed due to lack of database file in {interaction.guild}")
         await interaction.followup.send("❌ Database file not found.")
         return
 
     filename = f"verification_backup_{interaction.guild.id}.db" # type: ignore
 
+    logging.info(f"user {interaction.user} is exporting database for guild: {interaction.guild}")
     await interaction.followup.send(
         content="📦 Here is the current verification database:",
         file=discord.File(db_path, filename=filename)
     )
     
 @bot.tree.command(name="import", description="Replace the verification database with an uploaded backup")
+@app_commands.default_permissions(administrator=True) # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
@@ -342,6 +353,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
             tmp.write(data)
             temp_path = tmp.name
     except Exception as e:
+        logging.error("failed to create temp file for database import")
         await interaction.followup.send(f"❌ Failed to create temp file: {e}")
         return
 
@@ -372,14 +384,17 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         backup_path = db_path + ".backup"
         if os.path.exists(db_path):
             shutil.copy2(db_path, backup_path)
+        logging.info(f"created database backup at {backup_path}")
 
         shutil.move(temp_path, db_path)  # atomic replace
         get_guild_db(interaction.guild)  # type: ignore
 
         await interaction.followup.send("✅ Database imported successfully.")
         await log_admin(f"📥 {interaction.user} safely replaced the verification database.", interaction.guild)
+        logging.info(f"{interaction.user} replaced database for guild: {interaction.guild}")
 
     except Exception as e:
+        logging.error(f"database import failed with error: {e}")
         await interaction.followup.send(f"❌ Import failed during replacement: {e}")
 
         # Attempt rollback

@@ -1,5 +1,6 @@
 # Ours
 guild_dbs/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
