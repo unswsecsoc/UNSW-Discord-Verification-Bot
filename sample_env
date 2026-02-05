@@ -4,4 +4,4 @@ MAILGUN_API_KEY=YOUR_MAILGUN_API_KEY
 MAILGUN_DOMAIN=yourdomain.com
 MAILGUN_FROM=Verification Bot <verify@yourdomain.com>
 VERIFIED_ROLE_NAME=verified
-ALLOWED_EMAIL_DOMAINS=unsw.edu.au
+ALLOWED_EMAIL_DOMAINS=unsw.edu.au,student.unsw.edu.au,ad.unsw.edu.au

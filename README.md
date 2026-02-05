@@ -2,7 +2,7 @@
 This is a simple and secure email-based verification bot for UNSW students and staff, hosted for free by the UNSW Security Society.
 It is designed to be as simple as possible to implement in any UNSW society as quickly as possible.
 
-<add sreenshots of the verification process here (from user pov)>
+See images of the verification process in `images` folder.
 
 ## Setup
 1. Create a server role called `verified` which grants users access to server channels.
