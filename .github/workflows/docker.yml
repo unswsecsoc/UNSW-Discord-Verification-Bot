@@ -14,7 +14,7 @@ jobs:
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
       - name: Set tag
@@ -23,10 +23,10 @@ jobs:
 
       - name: Build Image
         run: |
-            docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKERHUB_PROJECT_NAME }}:latest \
-                         -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKERHUB_PROJECT_NAME }}:${{ steps.vars.outputs.TAG }} .
+            docker build -t ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_PROJECT_NAME }}:latest \
+                         -t ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_PROJECT_NAME }}:${{ steps.vars.outputs.TAG }} .
 
       - name: Push Image
         run: |
-            docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKERHUB_PROJECT_NAME }}:latest
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKERHUB_PROJECT_NAME }}:${{ steps.vars.outputs.TAG }}
+            docker push ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_PROJECT_NAME }}:latest
+            docker push ${{ vars.DOCKERHUB_USERNAME }}/${{ vars.DOCKERHUB_PROJECT_NAME }}:${{ steps.vars.outputs.TAG }}
