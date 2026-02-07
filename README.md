@@ -14,7 +14,9 @@ See images of the verification process in `images` folder.
 ### Important notes:
 The `verification-logs` channel should only be accessible by a few trusted members of the society's executive team to protect user privacy.
 The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'.
-^-- Utilise Discord roles to implement these.
+
+### Backups
+SecSoc does not guarantee the availability of backups for all societies so we reccommend regularly utilising the /export (admin only) command and maintain backups for your own society. If issues arise, contact `projects@unswsecurity.com` or for general problems, raise an issue on this GitHub repository.
 
 ## Contributing
 Any PRs, suggestions or issues raised will be attended to by the UNSW SecSoc Projects team. 
