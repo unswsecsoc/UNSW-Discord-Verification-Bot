@@ -1,0 +1,12 @@
+.env
+*.db
+__pycache__/
+.git
+.gitignore
+README.md
+venv/
+logs/
+images/
+HLA/
+guild_dbs/
+.github/
