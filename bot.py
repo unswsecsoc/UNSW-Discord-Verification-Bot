@@ -49,10 +49,12 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-# Database
+def safe_guild_name(guild: discord.Guild) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", guild.name)
+
+# TODO: Don't prepend DB_FOLDER here, do that later or rename function
 def safe_guild_filename(guild: discord.Guild):
-    name = re.sub(r"[^a-zA-Z0-9_-]", "_", guild.name)
-    return os.path.join(DB_FOLDER, f"{name}_{guild.id}.db")
+    return os.path.join(DB_FOLDER, f"{safe_guild_name(guild)}_{guild.id}.db")
 
 def get_guild_db(guild: discord.Guild):
     if guild.id in db_connections:
@@ -122,6 +124,8 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         email = self.email.value.strip().lower()
+        
+        logging.info(f"{interaction.user} is attempting to verify")
 
         # Check DB if already verified
         conn = get_guild_db(interaction.guild) # type: ignore Bot can only run in a guild
@@ -197,7 +201,9 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             await interaction.response.send_message("📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True)
             await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
         else:
-            logging.critical(f"OTP failed to send to {interaction.user} in {interaction.guild}")
+            # Could be an actual issue but could also just be that an invalid email was entered.
+            # If its an actual issue, then we might have run out of API usage this month.
+            logging.info(f"OTP failed to send to {interaction.user} in {interaction.guild}")
             await interaction.response.send_message("❌ Failed to send email.", ephemeral=True)
             await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
 
@@ -290,6 +296,7 @@ class OTPView(discord.ui.View):
     async def enter_otp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(OTPModal())
 
+# TODO: Remove this function since it is redundant.
 def get_guild_db_path(guild: discord.Guild) -> str:
     return f"{safe_guild_filename(guild)}"
 
@@ -300,7 +307,7 @@ def close_guild_db(guild: discord.Guild):
     if conn:
         conn.close()
 
-# ---------------- COMMAND ----------------
+# ---------------- COMMANDS ----------------
 # main command
 @tree.command(name="verify", description="Verify your email")
 @app_commands.guild_only()
@@ -336,27 +343,28 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
     if not file.filename.endswith(".db"):
-        await interaction.followup.send("❌ Please upload a valid .db SQLite file.")
+        await interaction.followup.send("❌ Please upload a valid .db SQLite3 file.")
         return
 
     db_path = get_guild_db_path(interaction.guild) # type: ignore
+    
+    # this is where backups will be stored later
+    guild_folder = safe_guild_name(interaction.guild) # type: ignore
+    backup_dir = os.path.join("guild_dbs", "backups", guild_folder)
+    os.makedirs(backup_dir, exist_ok=True)
 
+    temp_path = os.path.join(backup_dir, f"upload_{int(time.time())}.db")
+
+    # save uploaded db temporarily
     try:
         data = await file.read()
+        with open(temp_path, "wb") as f:
+            f.write(data)
     except Exception as e:
-        await interaction.followup.send(f"❌ Failed to read uploaded file: {e}")
+        await interaction.followup.send(f"❌ Failed to save uploaded file: {e}")
         return
 
-    # make sure we have a backup before we commit to replacing db with a broken one
-    try:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(data)
-            temp_path = tmp.name
-    except Exception as e:
-        logging.error("failed to create temp file for database import")
-        await interaction.followup.send(f"❌ Failed to create temp file: {e}")
-        return
-
+    # validate uploaded db
     try:
         test_conn = sqlite3.connect(temp_path)
         c = test_conn.cursor()
@@ -371,6 +379,13 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         if not c.fetchone():
             raise Exception("Missing required 'users' table")
 
+        # get table columns
+        c.execute("PRAGMA table_info(users);")
+        columns = {row[1] for row in c.fetchall()}
+
+        if "discord_id" not in columns or "email" not in columns:
+            raise Exception("Database must contain 'discord_id' and 'email' columns")
+        
         test_conn.close()
 
     except Exception as e:
@@ -378,16 +393,48 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         await interaction.followup.send(f"❌ Invalid database file: {e}")
         return
 
+    # since its valid lets add any missing fields to it so other functions continue working
+    try:
+        conn = sqlite3.connect(temp_path)
+        c = conn.cursor()
+
+        c.execute("PRAGMA table_info(users);")
+        columns = {row[1] for row in c.fetchall()}
+
+        # add missing columns if needed
+        if "verified" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN verified INTEGER DEFAULT 1;")
+        if "verified_at" not in columns and "time" not in columns:
+            c.execute("ALTER TABLE users ADD COLUMN verified_at TEXT;")
+
+        # if verified exists but is NULL, force verified = 1
+        c.execute("UPDATE users SET verified = 1 WHERE verified IS NULL;")
+
+        conn.commit()
+        conn.close()
+
+    except Exception as e:
+        os.remove(temp_path)
+        await interaction.followup.send(f"❌ Failed while upgrading database schema: {e}")
+        return
+    
+    # finally replace the db
     try:
         close_guild_db(interaction.guild)  # type: ignore
+        
+        timestamp = int(time.time())
+        guild_name = safe_guild_name(interaction.guild) # type: ignore
+        backup_filename = f"{guild_name}_{interaction.guild.id}_{timestamp}.backup" # type: ignore
+        backup_path = os.path.join(backup_dir, backup_filename)
 
-        backup_path = db_path + ".backup"
-        if os.path.exists(db_path):
-            shutil.copy2(db_path, backup_path)
-        logging.info(f"created database backup at {backup_path}")
-
-        shutil.move(temp_path, db_path)  # atomic replace
-        get_guild_db(interaction.guild)  # type: ignore
+        if os.path.exists(db_path): # move to backups folder
+            shutil.move(db_path, backup_path)
+            logging.info(f"created database backup at {backup_path}")
+        
+        # switch imported db into place
+        shutil.move(temp_path, db_path)
+        # open connection to new db
+        get_guild_db(interaction.guild) # type: ignore
 
         await interaction.followup.send("✅ Database imported successfully.")
         await log_admin(f"📥 {interaction.user} safely replaced the verification database.", interaction.guild)
@@ -398,9 +445,13 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         await interaction.followup.send(f"❌ Import failed during replacement: {e}")
 
         # Attempt rollback
-        if os.path.exists(backup_path): # type: ignore
-            shutil.move(backup_path, db_path) # type: ignore
-            get_guild_db(interaction.guild) # type: ignore
+        try:
+            if os.path.exists(backup_path): # pyright: ignore[reportPossiblyUnboundVariable]
+                shutil.move(backup_path, db_path) # pyright: ignore[reportPossiblyUnboundVariable]
+                get_guild_db(interaction.guild) # type: ignore
+                logging.info("Database rollback successful")
+        except Exception as rollback_error:
+            logging.critical(f"ROLLBACK FAILED: {rollback_error}")
 
     finally:
         if os.path.exists(temp_path):

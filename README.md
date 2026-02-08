@@ -8,15 +8,19 @@ See images of the verification process in `images` folder.
 1. Create a server role called `verified` which grants users access to server channels.
 2. Create a text channel called `verification-logs` 
 3. Create a `verify` text channel
-4. Invite the discord bot to the server and grant requested permissions [<link here>]
+4. Invite the discord bot to the server and grant requested permissions secso.cc/verificationbot
 5. Profit!?
 
 ### Important notes:
 The `verification-logs` channel should only be accessible by a few trusted members of the society's executive team to protect user privacy.
-The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'.
+The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'. Also, remove all permissions besides `Use Application Commands` for `@everyone`.
 
 ### Backups
 SecSoc does not guarantee the availability of backups for all societies so we reccommend regularly utilising the /export (admin only) command and maintain backups for your own society. If issues arise, contact `projects@unswsecurity.com` or for general problems, raise an issue on this GitHub repository.
+
+### Migration
+In order to migrate existing verified discord members to this verification bot, you will need to construct an SQLite3 database with columns `discord_id` as the primary key and `email` as the minimum requirement. Optionally, you may also add a `verified` column which stores values 1 or 0 indicating whether this person is actively verified on the server and also a `verified_at` column which stores time of verification in unix time. If `verified` is not specified, the column is created and its value defaults to 1 (meaning verified) and if `verified_at` is omitted then it is left as `NULL`.
+You may find it useful to utilise a Python script to migrate your current configuration into a valid database and feel free to contact `projects@unswsecurity.com` for help.
 
 ## Contributing
 Any PRs, suggestions or issues raised will be attended to by the UNSW SecSoc Projects team. 
