@@ -8,7 +8,7 @@ See images of the verification process in `images` folder.
 1. Create a server role called `verified` which grants users access to server channels.
 2. Create a text channel called `verification-logs` 
 3. Create a `verify` text channel
-4. Invite the discord bot to the server and grant requested permissions [secso.cc/verificationbot](secso.cc/verificationbot)
+4. Invite the discord bot to the server and grant requested permissions [secso.cc/verificationbot](http://secso.cc/verificationbot)
 5. Profit!?
 
 ### Important notes:
