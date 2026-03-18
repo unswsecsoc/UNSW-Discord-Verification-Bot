@@ -71,7 +71,7 @@ def get_guild_db(guild: discord.Guild):
             email TEXT,
             verified INTEGER NOT NULL CHECK (verified IN (0, 1)) DEFAULT 0,
             verified_at INTEGER CHECK (verified_at > 0),
-            CHECK (verified != (verified_at IS NULL))
+            CHECK ((verified_at IS NULL) OR verified) -- verified_at implies verified
         ) STRICT
     """)
     conn.commit()
@@ -80,7 +80,7 @@ def get_guild_db(guild: discord.Guild):
     return conn
 
 # Active OTP dictionary
-pending_verifications = {}  
+pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
 def generate_otp():
