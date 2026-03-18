@@ -328,7 +328,7 @@ async def export_db(interaction: discord.Interaction):
     filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo("Australia/Sydney")).strftime("%Y-%m-%d_%H-%M-%S")}.csv" # type: ignore
 
     logging.info(f"user {interaction.user} is exporting database for guild: {interaction.guild}")
-    await log_admin(f"📥 {interaction.user} exported the verification database.", interaction.guild)
+    await log_admin(f"📤 {interaction.user} exported the verification database.", interaction.guild)
     await interaction.followup.send(
         content="📦 Here is the current verification database:",
         file=discord.File(exported_csv, filename=filename)
