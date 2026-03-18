@@ -66,10 +66,9 @@ def export_db_to_csv(conn) -> io.StringIO:
     rows = cursor.fetchall()
     columns = [d[0] for d in cursor.description]
 
-    out = io.StringIO()
-    with open(out, mode="w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(columns)
-        writer.writerows(rows)
-
+    out = io.StringIO(newline="")
+    writer = csv.writer(out)
+    writer.writerow(columns)
+    writer.writerows(rows)
+    out.seek(0)
     return out

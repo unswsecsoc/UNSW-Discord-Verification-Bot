@@ -2,7 +2,6 @@ import os
 import re
 import sys
 import time
-import shutil
 import random
 import string
 import logging
@@ -200,13 +199,13 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         resp = send_email_otp(email, code)
 
         if resp.status_code == 200:
-            logging.info("OTP successfull sent")
+            logging.info("OTP successfully sent")
             await interaction.response.send_message("📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True)
             await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
         else:
             # Could be an actual issue but could also just be that an invalid email was entered.
             # If its an actual issue, then we might have run out of API usage this month.
-            logging.info(f"OTP failed to send to {interaction.user} in {interaction.guild}")
+            logging.warning(f"OTP failed to send to {interaction.user} in {interaction.guild}")
             await interaction.response.send_message("❌ Failed to send email.", ephemeral=True)
             await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
 
@@ -359,18 +358,19 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         await interaction.followup.send("❌ Import failed - failed to create a backup before importing")
 
     try:
-        success, message = import_csv_to_db(conn, file.read().decode(errors="backslashreplace"))
+        file_bytes = await file.read()
+        success, message = import_csv_to_db(conn, file_bytes.decode(errors="backslashreplace"))
         await interaction.followup.send(message)
     except Exception as e:
         logging.error(f"database import failed with error: {e}")
         await interaction.followup.send("❌ Import failed")
-
-    if success:
-        await log_admin(f"📥 {interaction.user} imported a new verification database.", interaction.guild)
-        logging.info(f"{interaction.user} replaced database for guild: {interaction.guild}")
     else:
-        await log_admin(f"❌ Database import requested by {interaction.user} failed: {message}", interaction.guild)
-        logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
+        if success:
+            await log_admin(f"📥 {interaction.user} imported a new verification database.", interaction.guild)
+            logging.info(f"{interaction.user} replaced database for guild: {interaction.guild}")
+        else:
+            await log_admin(f"❌ Database import requested by {interaction.user} failed.", interaction.guild)
+            logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
     
 
 @bot.event
