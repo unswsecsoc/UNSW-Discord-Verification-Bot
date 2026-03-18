@@ -21,8 +21,8 @@ class UserSchema(BaseModel):
     @model_validator(mode="after")
     def validate_both_or_none(self) -> "UserSchema":
         # Must have neither or both of these fields
-        if self.verified == (self.verified_at == None):
-            raise ValueError("Both 'verified' and 'verified_at' must be set, or neither.")
+        if not ((self.verified_at == None) or self.verified):
+            raise ValueError("If 'verified_at' is non-empty, verified must be 1.")
         return self
 
 
