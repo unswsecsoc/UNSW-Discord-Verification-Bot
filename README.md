@@ -41,3 +41,4 @@ At the time of writing, this bot provides many benefits over other bots with the
 ## Contributing
 Any PRs, suggestions or issues raised will be attended to by the UNSW SecSoc Projects team. 
 Feel free to create a pull request to fix typos, add features or improve performance if you wish and they will be reviewed and accepted if they are likely to prove useful for all societies.
+You can find a system flowchart here: [SecSoc Discord Verification.drawio.pdf](/SecSoc%20Discord%20Verification.drawio.pdf).
