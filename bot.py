@@ -27,9 +27,9 @@ logging.basicConfig(
 load_dotenv()
 
 DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
-MAILGUN_API_KEY = os.environ["MAILGUN_API_KEY"]
-MAILGUN_DOMAIN = os.environ["MAILGUN_DOMAIN"]
-MAILGUN_FROM = os.environ["MAILGUN_FROM"]
+MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY")
+MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN")
+MAILGUN_FROM = os.environ.get("MAILGUN_FROM")
 VERIFIED_ROLE_NAME = os.environ["VERIFIED_ROLE_NAME"]
 ALLOWED_DOMAINS = [d.strip().lower() for d in os.environ["ALLOWED_EMAIL_DOMAINS"].split(",")]
 
@@ -93,6 +93,12 @@ def valid_email_domain(email):
     return domain in ALLOWED_DOMAINS
 
 def send_email_otp(to_email, code):
+    if not MAILGUN_API_KEY:
+        print(f"OTP for {to_email}: {code}")
+        class MockResponse:
+            status_code = 200
+        return MockResponse()
+
     return requests.post(
         f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
         auth=("api", MAILGUN_API_KEY),
