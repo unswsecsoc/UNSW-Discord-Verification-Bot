@@ -384,5 +384,8 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 async def on_ready():
     await tree.sync()
     print(f"Logged in as {bot.user}")
+    if not MAILGUN_API_KEY:
+        logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
+        print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
 
 bot.run(DISCORD_TOKEN)
