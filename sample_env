@@ -1,6 +1,6 @@
 # Modify the values and save this file as .env
 DISCORD_TOKEN=YOUR_BOT_TOKEN
-MAILGUN_API_KEY=YOUR_MAILGUN_API_KEY
+MAILGUN_API_KEY=
 MAILGUN_DOMAIN=yourdomain.com
 MAILGUN_FROM=Verification Bot <verify@yourdomain.com>
 VERIFIED_ROLE_NAME=verified
