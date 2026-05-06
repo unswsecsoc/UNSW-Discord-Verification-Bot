@@ -3,18 +3,17 @@ import re
 import sys
 import time
 import secrets
-import string
 import logging
 import sqlite3
 import discord
 import requests
 from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
 from export import export_db_to_csv, import_csv_to_db
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import config
 
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
@@ -24,21 +23,7 @@ logging.basicConfig(
     level=logging.DEBUG
 )
 
-load_dotenv()
-
-DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
-MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY")
-MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN")
-MAILGUN_FROM = os.environ.get("MAILGUN_FROM")
-VERIFIED_ROLE_NAME = os.environ["VERIFIED_ROLE_NAME"]
-ALLOWED_DOMAINS = [d.strip().lower() for d in os.environ["ALLOWED_EMAIL_DOMAINS"].split(",")]
-
-OTP_EXPIRY_SECONDS = 600
-OTP_RESEND_COOLDOWN = 120
-OTP_LENGTH = 10
-
-DB_FOLDER = "guild_dbs"
-os.makedirs(DB_FOLDER, exist_ok=True)
+os.makedirs(config.DB_FOLDER, exist_ok=True)
 
 # one connection per guild
 db_connections = {}
@@ -55,7 +40,7 @@ def safe_guild_name(guild: discord.Guild) -> str:
 
 # TODO: Don't prepend DB_FOLDER here, do that later or rename function
 def safe_guild_filename(guild: discord.Guild):
-    return os.path.join(DB_FOLDER, f"{safe_guild_name(guild)}_{guild.id}.db")
+    return os.path.join(config.DB_FOLDER, f"{safe_guild_name(guild)}_{guild.id}.db")
 
 def get_guild_db(guild: discord.Guild):
     if guild.id in db_connections:
@@ -83,30 +68,30 @@ pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
 def generate_otp():
-    return ''.join(secrets.token_hex(nbytes=OTP_LENGTH // 2).upper())
+    return ''.join(secrets.token_hex(nbytes=config.OTP_LENGTH // 2).upper())
 
 def valid_email_domain(email):
     match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
     if not match:
         return False
     domain = match.group(1).lower()
-    return domain in ALLOWED_DOMAINS
+    return domain in config.ALLOWED_DOMAINS
 
 def send_email_otp(to_email, code):
-    if not MAILGUN_API_KEY:
+    if not config.MAILGUN_API_KEY:
         print(f"OTP for {to_email}: {code}")
         class MockResponse:
             status_code = 200
         return MockResponse()
 
     return requests.post(
-        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
-        auth=("api", MAILGUN_API_KEY),
+        f"https://api.mailgun.net/v3/{config.MAILGUN_DOMAIN}/messages",
+        auth=("api", config.MAILGUN_API_KEY),
         data={
-            "from": MAILGUN_FROM,
+            "from": config.MAILGUN_FROM,
             "to": [to_email],
             "subject": "Verify your email address",
-            "text": f"Your verification code is: {code}\nExpires in {OTP_EXPIRY_SECONDS/60} minutes."
+            "text": f"Your verification code is: {code}\nExpires in {config.OTP_EXPIRY_SECONDS/60} minutes."
         },
         timeout=10
     )
@@ -145,7 +130,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             guild = interaction.guild
             member = guild.get_member(user_id) # type: ignore Bot can only run in a guild
             bot_member = guild.get_member(bot.user.id)  # type: ignore
-            role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME) # type: ignore
+            role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME) # type: ignore
 
             if not member or not role or not bot_member:
                 await interaction.response.send_message("⚠️ You are verified but I couldn't check roles. Contact an admin.", ephemeral=True)
@@ -185,8 +170,8 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         key = (interaction.guild.id, user_id) # type: ignore
         record = pending_verifications.get(key)
 
-        if record and now - record["last_sent"] < OTP_RESEND_COOLDOWN:
-            remaining = int(OTP_RESEND_COOLDOWN - (now - record["last_sent"]))
+        if record and now - record["last_sent"] < config.OTP_RESEND_COOLDOWN:
+            remaining = int(config.OTP_RESEND_COOLDOWN - (now - record["last_sent"]))
             await interaction.response.send_message(
                 f"⏳ Wait {remaining}s before requesting another OTP.",
                 ephemeral=True
@@ -197,7 +182,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         key = (interaction.guild.id, user_id) # type: ignore
         pending_verifications[key] = {
             "code": code,
-            "expires": now + OTP_EXPIRY_SECONDS,
+            "expires": now + config.OTP_EXPIRY_SECONDS,
             "last_sent": now,
             "email": email
         }
@@ -216,7 +201,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
 
 class OTPModal(discord.ui.Modal, title="Enter pin"):
-    otp = discord.ui.TextInput(label=f"Enter the {OTP_LENGTH}-digit code", required=True)
+    otp = discord.ui.TextInput(label=f"Enter the {config.OTP_LENGTH}-digit code", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
@@ -260,7 +245,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             await interaction.response.send_message("❌ Verification failed (server state error).", ephemeral=True)
             return
 
-        role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME)
+        role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)
 
         if not role:
             await interaction.response.send_message("❌ Verified role not found. Contact an admin.", ephemeral=True)
@@ -289,7 +274,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             return
 
 
-        role = discord.utils.get(interaction.guild.roles, name=VERIFIED_ROLE_NAME) # type: ignore
+        role = discord.utils.get(interaction.guild.roles, name=config.VERIFIED_ROLE_NAME) # type: ignore
         if role:
             await interaction.user.add_roles(role) # type: ignore
 
@@ -384,8 +369,8 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 async def on_ready():
     await tree.sync()
     print(f"Logged in as {bot.user}")
-    if not MAILGUN_API_KEY:
+    if not config.MAILGUN_API_KEY:
         logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
         print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
 
-bot.run(DISCORD_TOKEN)
+bot.run(config.DISCORD_TOKEN)
