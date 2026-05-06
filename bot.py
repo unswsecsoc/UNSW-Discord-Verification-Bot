@@ -2,7 +2,6 @@ import os
 import time
 import json
 import hashlib
-import secrets
 import logging
 import sqlite3
 import discord
@@ -63,69 +62,33 @@ def get_guild_db(guild: discord.Guild):
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
-def generate_otp():
-    return ''.join(secrets.token_hex(nbytes=OTP_LENGTH // 2).upper())
-
-def valid_email_domain(email):
-    match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
-    if not match:
-        return False
-    domain = match.group(1).lower()
-    return domain in ALLOWED_DOMAINS
-
-def send_email_otp(to_email, code):
-    if not MAILGUN_API_KEY:
-        print(f"OTP for {to_email}: {code}")
-        class MockResponse:
-            status_code = 200
-        return MockResponse()
-
-    return requests.post(
-        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
-        auth=("api", MAILGUN_API_KEY),
-        data={
-            "from": MAILGUN_FROM,
-            "to": [to_email],
-            "subject": "Verify your email address",
-            "text": f"Your verification code is: {code}\nExpires in {OTP_EXPIRY_SECONDS/60} minutes."
-        },
-        timeout=10
-    )
-
-async def log_admin(message, guild):
-    channel = discord.utils.get(guild.text_channels, name="verification-logs")
-
-    if channel is None:
-        print(f"No #verification-logs channel in guild {guild.name}", file=sys.stderr)
-        return
-
-    if not channel.permissions_for(guild.me).send_messages:
-        print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
-        return
-
-    await channel.send(message)
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
     # Also changes if a parameter's mandatoriness changes
     commands = sorted(
-        ({
-            "name": c.name, 
-            "description": c.description,
-            "parameters": sorted(
-                ({ 
-                    "name": p.name, 
-                    "description": p.description, 
-                    "required": p.required
-                }
-                for p in c.parameters),
-                key=lambda p: p["name"]
-            )
-            } # type: ignore
-        for c in tree.get_commands()),
-        key=lambda c: c["name"]
+        (
+            {
+                "name": c.name,
+                "description": c.description,  # type: ignore
+                "parameters": sorted(
+                    (
+                        {
+                            "name": p.name,
+                            "description": p.description,
+                            "required": p.required,
+                        }
+                        for p in c.parameters # type: ignore
+                    ),
+                    key=lambda p: p["name"],
+                ),
+            }
+            for c in tree.get_commands()
+        ),
+        key=lambda c: c["name"],
     )
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
+
 
 # create a popup in discord upon /verify invocation
 class EmailModal(discord.ui.Modal, title="Email Verification"):
@@ -460,8 +423,14 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
                 f"{interaction.user} replaced database for guild: {interaction.guild}"
             )
         else:
-            await log_admin(f"❌ Database import requested by {interaction.user} failed.", interaction.guild)
-            logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
+            await log_admin(
+                f"❌ Database import requested by {interaction.user} failed.",
+                interaction.guild,
+            )
+            logging.warning(
+                f"Database import for guild {interaction.guild} failed: {message}"
+            )
+
 
 # Runs once on initial startup
 @bot.event
@@ -480,6 +449,7 @@ async def setup_hook():
         logging.info("Commands synced (hash changed)")
     else:
         logging.info("Commands unchanged, skipping sync")
+
 
 # Runs each time bot reconnects to a server
 @bot.event
