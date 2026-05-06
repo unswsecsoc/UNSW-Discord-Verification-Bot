@@ -1,44 +1,29 @@
 import os
-import re
-import sys
 import time
 import json
 import hashlib
-import secrets
 import logging
 import sqlite3
 import discord
-import requests
 from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
 from export import export_db_to_csv, import_csv_to_db
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-os.makedirs('logs', exist_ok=True)
+import config
+from otp import generate_otp, send_email_otp, valid_email_domain
+from utils import log_admin, safe_guild_filename, safe_guild_name
+
+os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    filename='logs/app.log',
-    filemode='a',
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG
+    filename="logs/app.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.DEBUG,
 )
 
-load_dotenv()
-
-DISCORD_TOKEN = os.environ["DISCORD_TOKEN"]
-MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY")
-MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN")
-MAILGUN_FROM = os.environ.get("MAILGUN_FROM")
-VERIFIED_ROLE_NAME = os.environ["VERIFIED_ROLE_NAME"]
-ALLOWED_DOMAINS = [d.strip().lower() for d in os.environ["ALLOWED_EMAIL_DOMAINS"].split(",")]
-
-OTP_EXPIRY_SECONDS = 600
-OTP_RESEND_COOLDOWN = 120
-OTP_LENGTH = 10
-
-DB_FOLDER = "guild_dbs"
-os.makedirs(DB_FOLDER, exist_ok=True)
+os.makedirs(config.DB_FOLDER, exist_ok=True)
 
 # one connection per guild
 db_connections = {}
@@ -50,12 +35,6 @@ intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 tree = bot.tree
 
-def safe_guild_name(guild: discord.Guild) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", guild.name)
-
-# TODO: Don't prepend DB_FOLDER here, do that later or rename function
-def safe_guild_filename(guild: discord.Guild):
-    return os.path.join(DB_FOLDER, f"{safe_guild_name(guild)}_{guild.id}.db")
 
 def get_guild_db(guild: discord.Guild):
     if guild.id in db_connections:
@@ -78,73 +57,38 @@ def get_guild_db(guild: discord.Guild):
     logging.info(f"created database for guild {guild.id}")
     return conn
 
+
 # Active OTP dictionary
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
-def generate_otp():
-    return ''.join(secrets.token_hex(nbytes=OTP_LENGTH // 2).upper())
-
-def valid_email_domain(email):
-    match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
-    if not match:
-        return False
-    domain = match.group(1).lower()
-    return domain in ALLOWED_DOMAINS
-
-def send_email_otp(to_email, code):
-    if not MAILGUN_API_KEY:
-        print(f"OTP for {to_email}: {code}")
-        class MockResponse:
-            status_code = 200
-        return MockResponse()
-
-    return requests.post(
-        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
-        auth=("api", MAILGUN_API_KEY),
-        data={
-            "from": MAILGUN_FROM,
-            "to": [to_email],
-            "subject": "Verify your email address",
-            "text": f"Your verification code is: {code}\nExpires in {OTP_EXPIRY_SECONDS/60} minutes."
-        },
-        timeout=10
-    )
-
-async def log_admin(message, guild):
-    channel = discord.utils.get(guild.text_channels, name="verification-logs")
-
-    if channel is None:
-        print(f"No #verification-logs channel in guild {guild.name}", file=sys.stderr)
-        return
-
-    if not channel.permissions_for(guild.me).send_messages:
-        print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
-        return
-
-    await channel.send(message)
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
     # Also changes if a parameter's mandatoriness changes
     commands = sorted(
-        ({
-            "name": c.name, 
-            "description": c.description,
-            "parameters": sorted(
-                ({ 
-                    "name": p.name, 
-                    "description": p.description, 
-                    "required": p.required
-                }
-                for p in c.parameters),
-                key=lambda p: p["name"]
-            )
-            } # type: ignore
-        for c in tree.get_commands()),
-        key=lambda c: c["name"]
+        (
+            {
+                "name": c.name,
+                "description": c.description,  # type: ignore
+                "parameters": sorted(
+                    (
+                        {
+                            "name": p.name,
+                            "description": p.description,
+                            "required": p.required,
+                        }
+                        for p in c.parameters  # type: ignore
+                    ),
+                    key=lambda p: p["name"],
+                ),
+            }
+            for c in tree.get_commands()
+        ),
+        key=lambda c: c["name"],
     )
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
+
 
 # create a popup in discord upon /verify invocation
 class EmailModal(discord.ui.Modal, title="Email Verification"):
@@ -153,99 +97,140 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         email = self.email.value.strip().lower()
-        
+
         logging.info(f"{interaction.user} is attempting to verify")
 
         # Check DB if already verified
-        conn = get_guild_db(interaction.guild) # type: ignore Bot can only run in a guild
+        conn = get_guild_db(interaction.guild)  # type: ignore Bot can only run in a guild
         c = conn.cursor()
         c.execute("SELECT verified, email FROM users WHERE discord_id=?", (user_id,))
         row = c.fetchone()
 
         if row and row[0] == 1:
             guild = interaction.guild
-            member = guild.get_member(user_id) # type: ignore Bot can only run in a guild
+            member = guild.get_member(user_id)  # type: ignore Bot can only run in a guild
             bot_member = guild.get_member(bot.user.id)  # type: ignore
-            role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME) # type: ignore
+            role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)  # type: ignore
 
             if not member or not role or not bot_member:
-                await interaction.response.send_message("⚠️ You are verified but I couldn't check roles. Contact an admin.", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ You are verified but I couldn't check roles. Contact an admin.",
+                    ephemeral=True,
+                )
                 return
 
             # If they already have the role
             if role in member.roles:
-                await interaction.response.send_message("✅ You are already verified.", ephemeral=True)
+                await interaction.response.send_message(
+                    "✅ You are already verified.", ephemeral=True
+                )
                 return
 
             # Role missing — try to restore it
-            if not guild.me.guild_permissions.manage_roles: # type: ignore
-                await interaction.response.send_message("⚠️ You're verified but I don't have permission to restore your role.", ephemeral=True)
+            if not guild.me.guild_permissions.manage_roles:  # type: ignore
+                await interaction.response.send_message(
+                    "⚠️ You're verified but I don't have permission to restore your role.",
+                    ephemeral=True,
+                )
                 return
 
             if role >= bot_member.top_role:
-                await interaction.response.send_message("⚠️ You're verified but my role is too low to re-assign yours.", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ You're verified but my role is too low to re-assign yours.",
+                    ephemeral=True,
+                )
                 return
 
             try:
                 await member.add_roles(role, reason="Restoring verified role")
-                await interaction.response.send_message("🔁 You were already verified — I've restored your role.", ephemeral=True)
-                await log_admin(f"♻️ Restored verified role for {interaction.user}", guild)
+                await interaction.response.send_message(
+                    "🔁 You were already verified — I've restored your role.",
+                    ephemeral=True,
+                )
+                await log_admin(
+                    f"♻️ Restored verified role for {interaction.user}", guild
+                )
             except discord.Forbidden:
-                await interaction.response.send_message("⚠️ Verified in database but role restore failed due to permissions.", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ Verified in database but role restore failed due to permissions.",
+                    ephemeral=True,
+                )
             except discord.HTTPException:
-                await interaction.response.send_message("⚠️ Discord error while restoring role. Try again later.", ephemeral=True)
+                await interaction.response.send_message(
+                    "⚠️ Discord error while restoring role. Try again later.",
+                    ephemeral=True,
+                )
 
             return
 
         if not valid_email_domain(email):
-            await interaction.response.send_message("❌ Email domain not allowed.", ephemeral=True)
-            await log_admin(f"🚫 {interaction.user} tried invalid domain: {email}", interaction.guild)
+            await interaction.response.send_message(
+                "❌ Email domain not allowed.", ephemeral=True
+            )
+            await log_admin(
+                f"🚫 {interaction.user} tried invalid domain: {email}",
+                interaction.guild,
+            )
             return
 
         now = time.time()
-        key = (interaction.guild.id, user_id) # type: ignore
+        key = (interaction.guild.id, user_id)  # type: ignore
         record = pending_verifications.get(key)
 
-        if record and now - record["last_sent"] < OTP_RESEND_COOLDOWN:
-            remaining = int(OTP_RESEND_COOLDOWN - (now - record["last_sent"]))
+        if record and now - record["last_sent"] < config.OTP_RESEND_COOLDOWN:
+            remaining = int(config.OTP_RESEND_COOLDOWN - (now - record["last_sent"]))
             await interaction.response.send_message(
-                f"⏳ Wait {remaining}s before requesting another OTP.",
-                ephemeral=True
+                f"⏳ Wait {remaining}s before requesting another OTP.", ephemeral=True
             )
             return
 
         code = generate_otp()
-        key = (interaction.guild.id, user_id) # type: ignore
+        key = (interaction.guild.id, user_id)  # type: ignore
         pending_verifications[key] = {
             "code": code,
-            "expires": now + OTP_EXPIRY_SECONDS,
+            "expires": now + config.OTP_EXPIRY_SECONDS,
             "last_sent": now,
-            "email": email
+            "email": email,
         }
 
         resp = send_email_otp(email, code)
 
         if resp.status_code == 200:
             logging.info("OTP successfully sent")
-            await interaction.response.send_message("📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True)
-            await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
+            await interaction.response.send_message(
+                "📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True
+            )
+            await log_admin(
+                f"📨 OTP sent to {email} for {interaction.user}", interaction.guild
+            )
         else:
             # Could be an actual issue but could also just be that an invalid email was entered.
             # If its an actual issue, then we might have run out of API usage this month.
-            logging.warning(f"OTP failed to send to {interaction.user} in {interaction.guild}")
-            await interaction.response.send_message("❌ Failed to send email.", ephemeral=True)
-            await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
+            logging.warning(
+                f"OTP failed to send to {interaction.user} in {interaction.guild}"
+            )
+            await interaction.response.send_message(
+                "❌ Failed to send email.", ephemeral=True
+            )
+            await log_admin(
+                f"❌ Mailgun failed for {interaction.user}", interaction.guild
+            )
+
 
 class OTPModal(discord.ui.Modal, title="Enter pin"):
-    otp = discord.ui.TextInput(label=f"Enter the {OTP_LENGTH}-digit code", required=True)
+    otp = discord.ui.TextInput(
+        label=f"Enter the {config.OTP_LENGTH}-digit code", required=True
+    )
 
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
-        key = (interaction.guild.id, user_id) # type: ignore
+        key = (interaction.guild.id, user_id)  # type: ignore
         record = pending_verifications.get(key)
 
         if not record:
-            await interaction.response.send_message("No active verification. Use /verify again.", ephemeral=True)
+            await interaction.response.send_message(
+                "No active verification. Use /verify again.", ephemeral=True
+            )
             return
 
         if time.time() > record["expires"]:
@@ -256,78 +241,101 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             return
 
         if self.otp.value.lower() != record["code"].lower():
-            await interaction.response.send_message("❌ Incorrect code.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Incorrect code.", ephemeral=True
+            )
             await log_admin(f"❌ Wrong OTP from {interaction.user}", interaction.guild)
             return
 
         # Success — store in DB
-        conn = get_guild_db(interaction.guild) # type: ignore Bot can only run in a guild
+        conn = get_guild_db(interaction.guild)  # type: ignore Bot can only run in a guild
         c = conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             INSERT INTO users (discord_id, email, verified, verified_at)
             VALUES (?, ?, 1, ?)
             ON CONFLICT(discord_id) DO UPDATE SET
                 email=excluded.email,
                 verified=1,
                 verified_at=excluded.verified_at
-        """, (user_id, record["email"], int(time.time())))
+        """,
+            (user_id, record["email"], int(time.time())),
+        )
         conn.commit()
-        
+
         guild = interaction.guild
-        member = interaction.guild.get_member(interaction.user.id) # type: ignore
-        bot_member = guild.get_member(bot.user.id) # type: ignore
+        member = interaction.guild.get_member(interaction.user.id)  # type: ignore
+        bot_member = guild.get_member(bot.user.id)  # type: ignore
 
         if not guild or not member or not bot_member:
-            await interaction.response.send_message("❌ Verification failed (server state error).", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Verification failed (server state error).", ephemeral=True
+            )
             return
 
-        role = discord.utils.get(guild.roles, name=VERIFIED_ROLE_NAME)
+        role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)
 
         if not role:
-            await interaction.response.send_message("❌ Verified role not found. Contact an admin.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Verified role not found. Contact an admin.", ephemeral=True
+            )
             return
 
         # permission check
         if not guild.me.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ Bot lacks **Manage Roles** permission.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Bot lacks **Manage Roles** permission.", ephemeral=True
+            )
             return
 
         # role hierarchy check
         if role >= bot_member.top_role:
             await interaction.response.send_message(
                 "❌ Bot cannot assign this role because it is higher than or equal to the bot's top role.",
-                ephemeral=True
+                ephemeral=True,
             )
             return
 
         try:
             await member.add_roles(role, reason="User completed email verification")
         except discord.Forbidden:
-            await interaction.response.send_message("❌ Permission error while assigning role.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Permission error while assigning role.", ephemeral=True
+            )
             return
         except discord.HTTPException:
-            await interaction.response.send_message("❌ Discord API error. Try again later.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Discord API error. Try again later.", ephemeral=True
+            )
             return
 
-
-        role = discord.utils.get(interaction.guild.roles, name=VERIFIED_ROLE_NAME) # type: ignore
+        role = discord.utils.get(interaction.guild.roles, name=config.VERIFIED_ROLE_NAME)  # type: ignore
         if role:
-            await interaction.user.add_roles(role) # type: ignore
+            await interaction.user.add_roles(role)  # type: ignore
 
         del pending_verifications[key]
 
-        await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
+        await interaction.response.send_message(
+            "✅ Verification successful!", ephemeral=True
+        )
         logging.info(f"verified user {interaction.user}")
-        await log_admin(f"✅ {interaction.user} verified with {record['email']}", interaction.guild)
+        await log_admin(
+            f"✅ {interaction.user} verified with {record['email']}", interaction.guild
+        )
+
 
 class OTPView(discord.ui.View):
     @discord.ui.button(label="Enter OTP", style=discord.ButtonStyle.primary)
-    async def enter_otp(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def enter_otp(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
         await interaction.response.send_modal(OTPModal())
+
 
 # TODO: Remove this function since it is redundant.
 def get_guild_db_path(guild: discord.Guild) -> str:
     return f"{safe_guild_filename(guild)}"
+
 
 def close_guild_db(guild: discord.Guild):
     logging.info(f"closing guild db connection for {guild}")
@@ -335,6 +343,7 @@ def close_guild_db(guild: discord.Guild):
     conn = db_connections.pop(gid, None)
     if conn:
         conn.close()
+
 
 # ---------------- COMMANDS ----------------
 # main command
@@ -345,60 +354,83 @@ async def verify(interaction: discord.Interaction):
 
 
 @bot.tree.command(name="export", description="Download the verification database file")
-@app_commands.default_permissions(administrator=True) # need to be admin
+@app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
-    exported_csv = export_db_to_csv(get_guild_db(interaction.guild))
+    exported_csv = export_db_to_csv(get_guild_db(interaction.guild))  # type: ignore
 
-    filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo("Australia/Sydney")).strftime("%Y-%m-%d_%H-%M-%S")}.csv" # type: ignore
+    filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo("Australia/Sydney")).strftime("%Y-%m-%d_%H-%M-%S")}.csv"  # type: ignore
 
-    logging.info(f"user {interaction.user} is exporting database for guild: {interaction.guild}")
-    await log_admin(f"📤 {interaction.user} exported the verification database.", interaction.guild)
+    logging.info(
+        f"user {interaction.user} is exporting database for guild: {interaction.guild}"
+    )
+    await log_admin(
+        f"📤 {interaction.user} exported the verification database.", interaction.guild
+    )
     await interaction.followup.send(
         content="📦 Here is the current verification database:",
-        file=discord.File(exported_csv, filename=filename)
+        file=discord.File(exported_csv, filename=filename),
     )
-    
-@bot.tree.command(name="import", description="Replace the verification database with an uploaded backup")
-@app_commands.default_permissions(administrator=True) # need to be admin
+
+
+@bot.tree.command(
+    name="import",
+    description="Replace the verification database with an uploaded backup",
+)
+@app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
-    conn = get_guild_db(interaction.guild)
-    
+    conn = get_guild_db(interaction.guild)  # type: ignore
+
     try:
-        guild_folder = safe_guild_name(interaction.guild) # type: ignore
+        guild_folder = safe_guild_name(interaction.guild)  # type: ignore
         backup_dir = os.path.join("guild_dbs", "backups", guild_folder)
         os.makedirs(backup_dir, exist_ok=True)
 
         timestamp = int(time.time())
-        guild_name = safe_guild_name(interaction.guild) # type: ignore
-        backup_filename = f"{guild_name}_{interaction.guild.id}_{timestamp}.db.backup" # type: ignore
+        guild_name = safe_guild_name(interaction.guild)  # type: ignore
+        backup_filename = f"{guild_name}_{interaction.guild.id}_{timestamp}.db.backup"  # type: ignore
         backup_path = os.path.join(backup_dir, backup_filename)
 
         with sqlite3.connect(backup_path) as backup_dest_conn:
             conn.backup(backup_dest_conn)
     except Exception as e:
         logging.error(f"Failed to back up db before importing: {e}")
-        await interaction.followup.send("❌ Import failed - failed to create a backup before importing")
+        await interaction.followup.send(
+            "❌ Import failed - failed to create a backup before importing"
+        )
 
     try:
         file_bytes = await file.read()
-        success, message = import_csv_to_db(conn, file_bytes.decode(errors="backslashreplace"))
+        success, message = import_csv_to_db(
+            conn, file_bytes.decode(errors="backslashreplace")
+        )
         await interaction.followup.send(message)
     except Exception as e:
         logging.error(f"database import failed with error: {e}")
         await interaction.followup.send("❌ Import failed")
     else:
         if success:
-            await log_admin(f"📥 {interaction.user} imported a new verification database.", interaction.guild)
-            logging.info(f"{interaction.user} replaced database for guild: {interaction.guild}")
+            await log_admin(
+                f"📥 {interaction.user} imported a new verification database.",
+                interaction.guild,
+            )
+            logging.info(
+                f"{interaction.user} replaced database for guild: {interaction.guild}"
+            )
         else:
-            await log_admin(f"❌ Database import requested by {interaction.user} failed.", interaction.guild)
-            logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
+            await log_admin(
+                f"❌ Database import requested by {interaction.user} failed.",
+                interaction.guild,
+            )
+            logging.warning(
+                f"Database import for guild {interaction.guild} failed: {message}"
+            )
+
 
 # Runs once on initial startup
 @bot.event
@@ -418,12 +450,18 @@ async def setup_hook():
     else:
         logging.info("Commands unchanged, skipping sync")
 
+
 # Runs each time bot reconnects to a server
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    if not MAILGUN_API_KEY:
-        logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
-        print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
+    if not config.MAILGUN_API_KEY:
+        logging.warning(
+            "No Mailgun API key provided. OTPs will be logged to the console."
+        )
+        print(
+            "WARNING: No Mailgun API key provided. OTPs will be logged to the console."
+        )
 
-bot.run(DISCORD_TOKEN)
+
+bot.run(config.DISCORD_TOKEN)
