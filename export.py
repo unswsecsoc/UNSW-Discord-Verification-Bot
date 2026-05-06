@@ -11,9 +11,9 @@ class UserSchema(BaseModel):
     verified: int = Field(default=0, ge=0, le=1)  # must be 0 or 1
     verified_at: Optional[int] = Field(default=None, gt=0, le=2**34)  # nulls ok
 
-    @field_validator('verified_at', mode='before')
+    @field_validator("verified_at", mode="before")
     @classmethod
-    def empty_str_to_none(cls, value):  
+    def empty_str_to_none(cls, value):
         if value == "":
             return None
         return value
@@ -32,14 +32,19 @@ def import_csv_to_db(conn, csv_contents: str) -> tuple[bool, str]:
     try:
         reader = csv.DictReader(io.StringIO(csv_contents))
 
-        for line_num, row in enumerate(reader, start=2):  # start=2 for CSV row numbering
+        for line_num, row in enumerate(
+            reader, start=2
+        ):  # start=2 for CSV row numbering
             try:
                 user = UserSchema.model_validate(row)
                 validated_rows.append(
                     (user.discord_id, user.email, user.verified, user.verified_at)
                 )
             except ValidationError as e:
-                return False, f"Validation Error on CSV line {line_num}:\n```{e.json(indent=2)}\n```"
+                return (
+                    False,
+                    f"Validation Error on CSV line {line_num}:\n```{e.json(indent=2)}\n```",
+                )
 
         cursor = conn.cursor()
         # Clear existing data
