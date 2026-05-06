@@ -2,7 +2,7 @@ import os
 import re
 import sys
 import time
-import random
+import secrets
 import string
 import logging
 import sqlite3
@@ -83,7 +83,7 @@ pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
 def generate_otp():
-    return ''.join(random.choices(string.digits, k=OTP_LENGTH))
+    return ''.join(secrets.token_hex(nbytes=OTP_LENGTH // 2).upper())
 
 def valid_email_domain(email):
     match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
@@ -234,7 +234,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             await log_admin(f"⌛ OTP expired for {interaction.user}", interaction.guild)
             return
 
-        if self.otp.value != record["code"]:
+        if self.otp.value.lower() != record["code"].lower():
             await interaction.response.send_message("❌ Incorrect code.", ephemeral=True)
             await log_admin(f"❌ Wrong OTP from {interaction.user}", interaction.guild)
             return
