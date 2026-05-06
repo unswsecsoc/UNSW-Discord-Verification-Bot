@@ -106,8 +106,22 @@ async def log_admin(message, guild):
     await channel.send(message)
 
 def get_commands_hash() -> str:
+    # Changes when a commands name or description, or its parameters' name or description changes
+    # Also changes if a parameter's mandatoriness changes
     commands = sorted(
-        ({"name": c.name, "description": c.description} # type: ignore
+        ({
+            "name": c.name, 
+            "description": c.description,
+            "parameters": sorted(
+                ({ 
+                    "name": p.name, 
+                    "description": p.description, 
+                    "required": p.required
+                }
+                for p in c.parameters),
+                key=lambda p: p["name"]
+            )
+            } # type: ignore
         for c in tree.get_commands()),
         key=lambda c: c["name"]
     )
