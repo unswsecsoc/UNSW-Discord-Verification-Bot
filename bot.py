@@ -332,7 +332,7 @@ class OTPView(discord.ui.View):
         await interaction.response.send_modal(OTPModal())
 
 
-class VerifyView(discord.ui.View):
+class VerifyButtonView(discord.ui.View):
     @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success)
     async def verify_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -445,12 +445,21 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     description="Send a verification button to this channel",
 )
 @app_commands.default_permissions(administrator=True)
+@app_commands.checks.bot_has_permissions(send_messages=True)
 async def send_verify_button(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    await interaction.channel.send(
-        "Click here to verify your email.", view=VerifyView()
-    )
-    await interaction.followup.send("Verification button sent.", ephemeral=True)
+    try:
+        await interaction.channel.send(
+            "Click here to verify your email.", view=VerifyButtonView()
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Failed to send verification button. "
+            "Does the bot have permissions to send messages in this channel?",
+            ephemeral=True
+        )
+    else:
+        await interaction.followup.send("Verification button sent.", ephemeral=True)
 
 
 # Runs once on initial startup
