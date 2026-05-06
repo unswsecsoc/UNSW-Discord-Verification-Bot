@@ -333,7 +333,10 @@ class OTPView(discord.ui.View):
 
 
 class VerifyButtonView(discord.ui.View):
-    @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success)
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success, custom_id="verify-button")
     async def verify_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ):
@@ -485,6 +488,7 @@ async def setup_hook():
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
     if not config.MAILGUN_API_KEY:
         logging.warning(
             "No Mailgun API key provided. OTPs will be logged to the console."
@@ -492,6 +496,9 @@ async def on_ready():
         print(
             "WARNING: No Mailgun API key provided. OTPs will be logged to the console."
         )
+
+    # Register the button view so it keeps working after a restart
+    bot.add_view(VerifyButtonView())
 
 
 bot.run(config.DISCORD_TOKEN)
