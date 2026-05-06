@@ -2,8 +2,9 @@ import os
 import re
 import sys
 import time
+import json
+import hashlib
 import secrets
-import string
 import logging
 import sqlite3
 import discord
@@ -14,7 +15,6 @@ from dotenv import load_dotenv
 from export import export_db_to_csv, import_csv_to_db
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
 
 os.makedirs('logs', exist_ok=True)
 logging.basicConfig(
@@ -124,6 +124,27 @@ async def log_admin(message, guild):
 
     await channel.send(message)
 
+def get_commands_hash() -> str:
+    # Changes when a commands name or description, or its parameters' name or description changes
+    # Also changes if a parameter's mandatoriness changes
+    commands = sorted(
+        ({
+            "name": c.name, 
+            "description": c.description,
+            "parameters": sorted(
+                ({ 
+                    "name": p.name, 
+                    "description": p.description, 
+                    "required": p.required
+                }
+                for p in c.parameters),
+                key=lambda p: p["name"]
+            )
+            } # type: ignore
+        for c in tree.get_commands()),
+        key=lambda c: c["name"]
+    )
+    return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
 
 # create a popup in discord upon /verify invocation
 class EmailModal(discord.ui.Modal, title="Email Verification"):
@@ -378,11 +399,28 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         else:
             await log_admin(f"❌ Database import requested by {interaction.user} failed.", interaction.guild)
             logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
-    
 
+# Runs once on initial startup
+@bot.event
+async def setup_hook():
+    current_hash = get_commands_hash()
+    stored_hash = None
+    # Using hashes avoids unecessary syncing
+    if os.path.exists("cmd_hash.txt"):
+        with open("cmd_hash.txt") as f:
+            stored_hash = f.read().strip()
+
+    if current_hash != stored_hash:
+        await tree.sync()
+        with open("cmd_hash.txt", "w") as f:
+            f.write(current_hash)
+        logging.info("Commands synced (hash changed)")
+    else:
+        logging.info("Commands unchanged, skipping sync")
+
+# Runs each time bot reconnects to a server
 @bot.event
 async def on_ready():
-    await tree.sync()
     print(f"Logged in as {bot.user}")
     if not MAILGUN_API_KEY:
         logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
