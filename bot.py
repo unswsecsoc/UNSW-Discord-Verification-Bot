@@ -332,6 +332,14 @@ class OTPView(discord.ui.View):
         await interaction.response.send_modal(OTPModal())
 
 
+class VerifyView(discord.ui.View):
+    @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success)
+    async def verify_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await interaction.response.send_modal(EmailModal())
+
+
 # TODO: Remove this function since it is redundant.
 def get_guild_db_path(guild: discord.Guild) -> str:
     return f"{safe_guild_filename(guild)}"
@@ -430,6 +438,19 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
             logging.warning(
                 f"Database import for guild {interaction.guild} failed: {message}"
             )
+
+
+@bot.tree.command(
+    name="send-verify-button",
+    description="Send a verification button to this channel",
+)
+@app_commands.default_permissions(administrator=True)
+async def send_verify_button(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    await interaction.channel.send(
+        "Click here to verify your email.", view=VerifyView()
+    )
+    await interaction.followup.send("Verification button sent.", ephemeral=True)
 
 
 # Runs once on initial startup
