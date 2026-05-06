@@ -78,7 +78,7 @@ def get_commands_hash() -> str:
                             "description": p.description,
                             "required": p.required,
                         }
-                        for p in c.parameters # type: ignore
+                        for p in c.parameters  # type: ignore
                     ),
                     key=lambda p: p["name"],
                 ),
@@ -89,27 +89,6 @@ def get_commands_hash() -> str:
     )
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
 
-def get_commands_hash() -> str:
-    # Changes when a commands name or description, or its parameters' name or description changes
-    # Also changes if a parameter's mandatoriness changes
-    commands = sorted(
-        ({
-            "name": c.name, 
-            "description": c.description,
-            "parameters": sorted(
-                ({ 
-                    "name": p.name, 
-                    "description": p.description, 
-                    "required": p.required
-                }
-                for p in c.parameters),
-                key=lambda p: p["name"]
-            )
-            } # type: ignore
-        for c in tree.get_commands()),
-        key=lambda c: c["name"]
-    )
-    return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
 
 # create a popup in discord upon /verify invocation
 class EmailModal(discord.ui.Modal, title="Email Verification"):
