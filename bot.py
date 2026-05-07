@@ -90,7 +90,7 @@ def get_commands_hash() -> str:
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
 
 
-# create a popup in discord upon /verify invocation
+# modal for the user to enter their email
 class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
@@ -229,7 +229,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         if not record:
             await interaction.response.send_message(
-                "No active verification. Use /verify again.", ephemeral=True
+                "No active verification. Please click the `Verify Email` button again.", ephemeral=True
             )
             return
 
@@ -357,13 +357,6 @@ def close_guild_db(guild: discord.Guild):
 
 
 # ---------------- COMMANDS ----------------
-# main command
-@tree.command(name="verify", description="Verify your email")
-@app_commands.guild_only()
-async def verify(interaction: discord.Interaction):
-    await interaction.response.send_modal(EmailModal())
-
-
 @bot.tree.command(name="export", description="Download the verification database file")
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
