@@ -376,7 +376,7 @@ async def export_db(interaction: discord.Interaction):
 
     exported_csv = export_db_to_csv(get_guild_db(interaction.guild))  # type: ignore
 
-    filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo("Australia/Sydney")).strftime("%Y-%m-%d_%H-%M-%S")}.csv"  # type: ignore
+    filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo('Australia/Sydney')).strftime('%Y-%m-%d_%H-%M-%S')}.csv"  # type: ignore
 
     logging.info(
         f"user {interaction.user} is exporting database for guild: {interaction.guild}"
