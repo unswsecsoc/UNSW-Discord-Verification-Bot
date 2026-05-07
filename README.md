@@ -46,7 +46,7 @@ At the time of writing, this bot provides many benefits over other bots with the
 - Ability for societies to manage their own backups
 - No dependencies on other small projects
 - Verification emails don't get marked as junk mail by UNSW
-- Easily self-hostable via [Docker Hub image](https://hub.docker.com/repository/docker/unswsecsoc/unsw-discord-verification-bot)
+- Easily self-hostable via [Docker Hub image](https://hub.docker.com/r/unswsecsoc/unsw-discord-verification-bot)
 - Easy to migrate from existing verification solutions
 - Support from SecSoc Projects team if issues arise
 - Extremely fast setup
