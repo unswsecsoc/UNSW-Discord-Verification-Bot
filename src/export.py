@@ -32,6 +32,10 @@ def import_csv_to_db(conn, csv_contents: str) -> tuple[bool, str]:
     try:
         reader = csv.DictReader(io.StringIO(csv_contents))
 
+        if set(reader.fieldnames) != set(UserSchema.model_fields.keys()):
+            return False, ("Validation Error: CSV column names are incorrect, "
+                           f"should be `{set(UserSchema.model_fields.keys())}`.")
+
         for line_num, row in enumerate(
             reader, start=2
         ):  # start=2 for CSV row numbering
