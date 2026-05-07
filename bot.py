@@ -4,7 +4,6 @@ import json
 import hashlib
 import logging
 import sqlite3
-import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -63,18 +62,19 @@ def get_guild_db(guild: discord.Guild):
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
+async def handle_expired_otp(key):
+    record = pending_verifications.get(key)
+    if record and time.time() > record["expires"]:
+        del pending_verifications[key]
 
-def schedule_pending_verification_expiry(key, code, timeout_seconds):
-    loop = asyncio.get_running_loop()
+        guild_id, user_id = key
+        guild = bot.get_guild(guild_id)  # type: ignore
+        user = guild.get_member(user_id) if guild else None  # type: ignore
 
-    def expire_pending_verification():
-        # only delete if record is not stale
-        record = pending_verifications.get(key)
-        if record and record.get("code") == code and record.get("expires") == expires_at:
-            del pending_verifications[key]
-
-    loop.call_later(timeout_seconds, expire_pending_verification)
-
+        if guild:
+            await log_admin(f"⌛ OTP expired for {user}", guild)
+        return True
+    return False
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
@@ -206,9 +206,10 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             "email": email,
         }
 
-        schedule_pending_verification_expiry(
-            key, code, config.OTP_EXPIRY_SECONDS
-        )
+        # delete all expired pending verifications
+        keys = list(pending_verifications.keys())
+        for key in keys:
+            await handle_expired_otp(key)
 
         resp = send_email_otp(email, code)
 
@@ -250,11 +251,8 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             )
             return
 
-        if time.time() > record["expires"]:
-            del pending_verifications[key]
-
+        if await handle_expired_otp(key):
             await interaction.response.send_message("⏰ Code expired.", ephemeral=True)
-            await log_admin(f"⌛ OTP expired for {interaction.user}", interaction.guild)
             return
 
         if self.otp.value.lower() != record["code"].lower():
