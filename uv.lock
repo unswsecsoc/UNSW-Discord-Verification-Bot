@@ -490,27 +490,10 @@ name = "unsw-discord-verification-bot"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "aiohappyeyeballs" },
-    { name = "aiohttp" },
-    { name = "aiosignal" },
-    { name = "annotated-types" },
-    { name = "attrs" },
-    { name = "audioop-lts" },
-    { name = "certifi" },
-    { name = "charset-normalizer" },
     { name = "discord-py" },
-    { name = "frozenlist" },
-    { name = "idna" },
-    { name = "multidict" },
-    { name = "propcache" },
     { name = "pydantic" },
-    { name = "pydantic-core" },
     { name = "python-dotenv" },
     { name = "requests" },
-    { name = "typing-extensions" },
-    { name = "typing-inspection" },
-    { name = "urllib3" },
-    { name = "yarl" },
 ]
 
 [package.dev-dependencies]
@@ -522,27 +505,10 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohappyeyeballs", specifier = "==2.6.1" },
-    { name = "aiohttp", specifier = "==3.13.3" },
-    { name = "aiosignal", specifier = "==1.4.0" },
-    { name = "annotated-types", specifier = "==0.7.0" },
-    { name = "attrs", specifier = "==25.4.0" },
-    { name = "audioop-lts", specifier = "==0.2.2" },
-    { name = "certifi", specifier = "==2026.1.4" },
-    { name = "charset-normalizer", specifier = "==3.4.4" },
     { name = "discord-py", specifier = "==2.6.4" },
-    { name = "frozenlist", specifier = "==1.8.0" },
-    { name = "idna", specifier = "==3.11" },
-    { name = "multidict", specifier = "==6.7.1" },
-    { name = "propcache", specifier = "==0.4.1" },
     { name = "pydantic", specifier = "==2.12.5" },
-    { name = "pydantic-core", specifier = "==2.41.5" },
     { name = "python-dotenv", specifier = "==1.2.1" },
     { name = "requests", specifier = "==2.32.5" },
-    { name = "typing-extensions", specifier = "==4.15.0" },
-    { name = "typing-inspection", specifier = "==0.4.2" },
-    { name = "urllib3", specifier = "==2.6.3" },
-    { name = "yarl", specifier = "==1.22.0" },
 ]
 
 [package.metadata.requires-dev]
