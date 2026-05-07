@@ -7,24 +7,36 @@ It is designed to be as simple as possible to implement in any UNSW society as q
 See images of the verification process in `images` folder.
 
 ## Setup
-1. Create a server role called `verified` which grants users access to server channels.
-2. Create a text channel called `verification-logs` 
-3. Create a `verify` text channel
-4. Invite the discord bot to the server and grant requested permissions [secso.cc/verificationbot](http://secso.cc/verificationbot)
+1. Create a server role called `verified` which grants users access to server channels
+2. Create an admin-only `#verification-logs` text channel
+3. Create a `#verify` text channel
+4. Invite the discord bot to the server and grant requested permissions ([secso.cc/verificationbot](http://secso.cc/verificationbot))
+5. Run `/send-verify-button` in `#verify`
 5. Profit!?
+
+Once these steps are complete users will be able to verify by clicking the `Verify Email` button.
 
 ### Important notes:
 The bot user role must be higher in the hierarchy than the `verified` role in server settings. \
 The `verification-logs` channel should only be accessible by a few trusted members of the society's executive team to protect user privacy. \
 The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'. \
-Also, remove all permissions besides `Use Application Commands` for `@everyone`.
+Also, remove all permissions from `@everyone`. They will still be able to use the verification button.
 
-### Backups
-SecSoc does not guarantee the availability of backups for all societies so we reccommend regularly utilising the /export (admin only) command and maintain backups for your own society. If issues arise, contact `projects@unswsecurity.com` or for general problems, raise an issue on this GitHub repository.
+## Backups
+SecSoc does not guarantee the availability of backups for all societies so we reccommend regularly utilising the `/export` (admin only) command and maintain backups for your own society. If issues arise, contact `projects@unswsecurity.com` or for general problems, raise an issue on this GitHub repository.
 
-### Migration
-In order to migrate existing verified discord members to this verification bot, you will need to construct an SQLite3 database with columns `discord_id` as the primary key and `email` as the minimum requirement. Optionally, you may also add a `verified` column which stores values 1 or 0 indicating whether this person is actively verified on the server and also a `verified_at` column which stores time of verification in unix time. If `verified` is not specified, the column is created and its value defaults to 1 (meaning verified) and if `verified_at` is omitted then it is left as `NULL`.
-You may find it useful to utilise a Python script to migrate your current configuration into a valid database and feel free to contact `projects@unswsecurity.com` for help.
+## Migration
+In order to migrate existing verified discord members to this verification bot, you will need to `/import` a CSV in the following format:
+
+```csv
+discord_id,email,verified,verified_at
+123456789123456789,person1@ad.unsw.edu.au,1,
+234567892345678923,person2@ad.unsw.edu.au,1,
+```
+
+Every row must contain at least a `discord_id` and `email`. If `verified` is omitted it will default to 0 (false). Optionally, you may also add an informational `verified_at` value which stores the time of verification in unix seconds.
+
+You may find it useful to utilise a Python script to migrate your current configuration to a CSV. Feel free to contact `projects@unswsecurity.com` for help.
 
 ## Why this bot
 At the time of writing, this bot provides many benefits over other bots with the same aim:

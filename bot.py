@@ -90,7 +90,7 @@ def get_commands_hash() -> str:
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
 
 
-# create a popup in discord upon /verify invocation
+# modal for the user to enter their email
 class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
@@ -229,7 +229,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         if not record:
             await interaction.response.send_message(
-                "No active verification. Use /verify again.", ephemeral=True
+                "No active verification. Please click the `Verify Email` button again.", ephemeral=True
             )
             return
 
@@ -332,6 +332,17 @@ class OTPView(discord.ui.View):
         await interaction.response.send_modal(OTPModal())
 
 
+class VerifyButtonView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success, custom_id="verify-button")
+    async def verify_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ):
+        await interaction.response.send_modal(EmailModal())
+
+
 # TODO: Remove this function since it is redundant.
 def get_guild_db_path(guild: discord.Guild) -> str:
     return f"{safe_guild_filename(guild)}"
@@ -346,13 +357,6 @@ def close_guild_db(guild: discord.Guild):
 
 
 # ---------------- COMMANDS ----------------
-# main command
-@tree.command(name="verify", description="Verify your email")
-@app_commands.guild_only()
-async def verify(interaction: discord.Interaction):
-    await interaction.response.send_modal(EmailModal())
-
-
 @bot.tree.command(name="export", description="Download the verification database file")
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
@@ -432,6 +436,28 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
             )
 
 
+@bot.tree.command(
+    name="send-verify-button",
+    description="Send a verification button to this channel",
+)
+@app_commands.default_permissions(administrator=True)
+@app_commands.checks.bot_has_permissions(send_messages=True)
+async def send_verify_button(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    try:
+        await interaction.channel.send(
+            "Click here to verify your email.", view=VerifyButtonView()
+        )
+    except discord.Forbidden:
+        await interaction.followup.send(
+            "Failed to send verification button. "
+            "Does the bot have permissions to send messages in this channel?",
+            ephemeral=True
+        )
+    else:
+        await interaction.followup.send("Verification button sent.", ephemeral=True)
+
+
 # Runs once on initial startup
 @bot.event
 async def setup_hook():
@@ -455,6 +481,7 @@ async def setup_hook():
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
     if not config.MAILGUN_API_KEY:
         logging.warning(
             "No Mailgun API key provided. OTPs will be logged to the console."
@@ -462,6 +489,9 @@ async def on_ready():
         print(
             "WARNING: No Mailgun API key provided. OTPs will be logged to the console."
         )
+
+    # Register the button view so it keeps working after a restart
+    bot.add_view(VerifyButtonView())
 
 
 bot.run(config.DISCORD_TOKEN)
