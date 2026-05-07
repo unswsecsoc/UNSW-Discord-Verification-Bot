@@ -15,15 +15,15 @@ import config
 from otp import generate_otp, send_email_otp, valid_email_domain
 from utils import log_admin, get_guild_db_path, get_guild_dir, save_guild_info
 
-os.makedirs(config.LOG_FOLDER, exist_ok=True)
+os.makedirs(config.LOG_DIR, exist_ok=True)
 logging.basicConfig(
-    filename=os.path.join(config.LOG_FOLDER, "app.log"),
+    filename=os.path.join(config.LOG_DIR, "app.log"),
     filemode="a",
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.DEBUG,
 )
 
-os.makedirs(config.DB_FOLDER, exist_ok=True)
+os.makedirs(config.DB_DIR, exist_ok=True)
 
 # one connection per guild
 db_connections = {}

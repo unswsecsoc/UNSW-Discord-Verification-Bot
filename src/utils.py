@@ -5,7 +5,7 @@ import config
 
 
 def get_guild_dir(guild: discord.Guild):
-    return os.path.join(config.DB_FOLDER, str(guild.id))
+    return os.path.join(config.DB_DIR, str(guild.id))
 
 
 def get_guild_db_path(guild: discord.Guild):
