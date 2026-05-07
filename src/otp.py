@@ -5,7 +5,7 @@ import requests
 
 import config
 
-with open("email_template.html") as f:
+with open("templates/email_template.html") as f:
     EMAIL_HTML_TEMPLATE = f.read()
 
 

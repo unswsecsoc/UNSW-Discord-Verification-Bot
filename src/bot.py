@@ -15,9 +15,9 @@ import config
 from otp import generate_otp, send_email_otp, valid_email_domain
 from utils import log_admin, get_guild_db_path, get_guild_dir, save_guild_info
 
-os.makedirs("logs", exist_ok=True)
+os.makedirs(config.LOG_FOLDER, exist_ok=True)
 logging.basicConfig(
-    filename="logs/app.log",
+    filename=os.path.join(config.LOG_FOLDER, "app.log"),
     filemode="a",
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.DEBUG,
@@ -65,7 +65,6 @@ def get_guild_db(guild: discord.Guild):
 # Active OTP dictionary
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
-
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes

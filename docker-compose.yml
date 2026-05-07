@@ -1,0 +1,8 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./logs:/app/logs
+      - ./guild_dbs:/app/guild_dbs
