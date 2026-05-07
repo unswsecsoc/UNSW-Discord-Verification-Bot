@@ -62,20 +62,6 @@ def get_guild_db(guild: discord.Guild):
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
 
-async def handle_expired_otp(key):
-    record = pending_verifications.get(key)
-    if record and time.time() > record["expires"]:
-        del pending_verifications[key]
-
-        guild_id, user_id = key
-        guild = bot.get_guild(guild_id)  # type: ignore
-        user = guild.get_member(user_id) if guild else None  # type: ignore
-
-        if guild:
-            await log_admin(f"⌛ OTP expired for {user}", guild)
-        return True
-    return False
-
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
     # Also changes if a parameter's mandatoriness changes
@@ -209,7 +195,17 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         # delete all expired pending verifications
         keys = list(pending_verifications.keys())
         for key in keys:
-            await handle_expired_otp(key)
+            if now < pending_verifications[key]["expires"] + config.PENDING_VERIFICATION_GRACE_PERIOD:
+                continue
+
+            del pending_verifications[key]
+
+            guild_id, user_id = key
+            guild = bot.get_guild(guild_id)
+            user = guild.get_member(user_id) if guild else None  # type: ignore
+
+            if guild:
+                await log_admin(f"⌛ OTP deleted for {user}", guild)
 
         resp = send_email_otp(email, code)
 
@@ -251,7 +247,9 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             )
             return
 
-        if await handle_expired_otp(key):
+        if time.time() > record["expires"]:
+            del pending_verifications[key]
+            await log_admin(f"⌛ OTP deleted for {interaction.user}", interaction.guild)
             await interaction.response.send_message("⏰ Code expired.", ephemeral=True)
             return
 
