@@ -4,7 +4,6 @@ import json
 import hashlib
 import logging
 import sqlite3
-import asyncio
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -62,19 +61,6 @@ def get_guild_db(guild: discord.Guild):
 # Active OTP dictionary
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
-
-
-def schedule_pending_verification_expiry(key, code, timeout_seconds):
-    loop = asyncio.get_running_loop()
-
-    def expire_pending_verification():
-        # only delete if record is not stale
-        record = pending_verifications.get(key)
-        if record and record.get("code") == code and record.get("expires") == expires_at:
-            del pending_verifications[key]
-
-    loop.call_later(timeout_seconds, expire_pending_verification)
-
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
@@ -205,10 +191,6 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             "last_sent": now,
             "email": email,
         }
-
-        schedule_pending_verification_expiry(
-            key, code, config.OTP_EXPIRY_SECONDS
-        )
 
         resp = send_email_otp(email, code)
 
