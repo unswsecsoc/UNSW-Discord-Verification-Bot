@@ -45,6 +45,14 @@ select = [
     "ICN001", # unconventional-import-alias
 ]
 ignore = [
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D102", # Missing docstring in public method
+    "D103", # Missing docstring in public function
+    "D104", # Missing docstring in public package
+    "D105", # Missing docstring in magic method
+    "D106", # Missing docstring in public nested class
+    "D107", # Missing docstring in __init__
     "PLR0911", # Too many returns
     "PLR0912", # Too many branches
     "PLR0913", # Too many arguments to function call
@@ -52,6 +60,7 @@ ignore = [
     "PLR0915", # Too many statements
     "PLR1702", # Too many nested-blocks
     "PLC0415", # Local imports which may be performance related
+    "PLR2004", # Magic value used in comparison
 ]
 
 [tool.ruff.lint.pydocstyle]

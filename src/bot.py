@@ -1,19 +1,20 @@
-import os
-import time
-import json
 import hashlib
+import json
 import logging
+import os
 import sqlite3
-import discord
-from discord import app_commands
-from discord.ext import commands
-from export import export_db_to_csv, import_csv_to_db
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import discord
+from discord import app_commands
+from discord.ext import commands
+
 import config
+from export import export_db_to_csv, import_csv_to_db
 from otp import generate_otp, send_email_otp, valid_email_domain
-from utils import log_admin, get_guild_db_path, get_guild_dir, save_guild_info
+from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
 
 os.makedirs(config.LOG_DIR, exist_ok=True)
 logging.basicConfig(
@@ -65,6 +66,7 @@ def get_guild_db(guild: discord.Guild):
 # Active OTP dictionary
 pending_verifications = {}
 # (guild_id, user_id): {code, expires, last_sent, email}
+
 
 def get_commands_hash() -> str:
     # Changes when a commands name or description, or its parameters' name or description changes
@@ -150,9 +152,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
                     "🔁 You were already verified — I've restored your role.",
                     ephemeral=True,
                 )
-                await log_admin(
-                    f"♻️ Restored verified role for {interaction.user}", guild
-                )
+                await log_admin(f"♻️ Restored verified role for {interaction.user}", guild)
             except discord.Forbidden:
                 await interaction.response.send_message(
                     "⚠️ Verified in database but role restore failed due to permissions.",
@@ -167,9 +167,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             return
 
         if not valid_email_domain(email):
-            await interaction.response.send_message(
-                "❌ Email domain not allowed.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Email domain not allowed.", ephemeral=True)
             await log_admin(
                 f"🚫 {interaction.user} tried invalid domain: {email}",
                 interaction.guild,
@@ -203,27 +201,17 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             await interaction.response.send_message(
                 "📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True
             )
-            await log_admin(
-                f"📨 OTP sent to {email} for {interaction.user}", interaction.guild
-            )
+            await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
         else:
             # Could be an actual issue but could also just be that an invalid email was entered.
             # If its an actual issue, then we might have run out of API usage this month.
-            logging.warning(
-                f"OTP failed to send to {interaction.user} in {interaction.guild}"
-            )
-            await interaction.response.send_message(
-                "❌ Failed to send email.", ephemeral=True
-            )
-            await log_admin(
-                f"❌ Mailgun failed for {interaction.user}", interaction.guild
-            )
+            logging.warning(f"OTP failed to send to {interaction.user} in {interaction.guild}")
+            await interaction.response.send_message("❌ Failed to send email.", ephemeral=True)
+            await log_admin(f"❌ Mailgun failed for {interaction.user}", interaction.guild)
 
 
 class OTPModal(discord.ui.Modal, title="Enter pin"):
-    otp = discord.ui.TextInput(
-        label=f"Enter the {config.OTP_LENGTH}-digit code", required=True
-    )
+    otp = discord.ui.TextInput(label=f"Enter the {config.OTP_LENGTH}-digit code", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
@@ -232,7 +220,8 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         if not record:
             await interaction.response.send_message(
-                "No active verification. Please click the `Verify Email` button again.", ephemeral=True
+                "No active verification. Please click the `Verify Email` button again.",
+                ephemeral=True,
             )
             return
 
@@ -244,9 +233,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             return
 
         if self.otp.value.lower() != record["code"].lower():
-            await interaction.response.send_message(
-                "❌ Incorrect code.", ephemeral=True
-            )
+            await interaction.response.send_message("❌ Incorrect code.", ephemeral=True)
             await log_admin(f"❌ Wrong OTP from {interaction.user}", interaction.guild)
             return
 
@@ -294,7 +281,8 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
         # role hierarchy check
         if role >= bot_member.top_role:
             await interaction.response.send_message(
-                "❌ Bot cannot assign this role because it is higher than or equal to the bot's top role.",
+                "❌ Bot cannot assign this role because it is higher than "
+                "or equal to the bot's top role.",
                 ephemeral=True,
             )
             return
@@ -318,20 +306,14 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         del pending_verifications[key]
 
-        await interaction.response.send_message(
-            "✅ Verification successful!", ephemeral=True
-        )
+        await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
         logging.info(f"verified user {interaction.user}")
-        await log_admin(
-            f"✅ {interaction.user} verified with {record['email']}", interaction.guild
-        )
+        await log_admin(f"✅ {interaction.user} verified with {record['email']}", interaction.guild)
 
 
 class OTPView(discord.ui.View):
     @discord.ui.button(label="Enter OTP", style=discord.ButtonStyle.primary)
-    async def enter_otp(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    async def enter_otp(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(OTPModal())
 
 
@@ -339,10 +321,10 @@ class VerifyButtonView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Verify Email", style=discord.ButtonStyle.success, custom_id="verify-button")
-    async def verify_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
+    @discord.ui.button(
+        label="Verify Email", style=discord.ButtonStyle.success, custom_id="verify-button"
+    )
+    async def verify_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(EmailModal())
 
 
@@ -358,19 +340,19 @@ def close_guild_db(guild: discord.Guild):
 @bot.tree.command(name="export", description="Download the verification database file")
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
     exported_csv = export_db_to_csv(get_guild_db(interaction.guild))  # type: ignore
 
-    filename = f"verification_backup_{interaction.guild.id}_{datetime.now(ZoneInfo("Australia/Sydney")).strftime("%Y-%m-%d_%H-%M-%S")}.csv"  # type: ignore
+    filename = (
+        f"verification_backup_{interaction.guild.id}"  # type: ignore
+        f"_{datetime.now(ZoneInfo('Australia/Sydney')).strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    )
 
-    logging.info(
-        f"user {interaction.user} is exporting database for guild: {interaction.guild}"
-    )
-    await log_admin(
-        f"📤 {interaction.user} exported the verification database.", interaction.guild
-    )
+    logging.info(f"user {interaction.user} is exporting database for guild: {interaction.guild}")
+    await log_admin(f"📤 {interaction.user} exported the verification database.", interaction.guild)
     await interaction.followup.send(
         content="📦 Here is the current verification database:",
         file=discord.File(exported_csv, filename=filename),
@@ -383,13 +365,14 @@ async def export_db(interaction: discord.Interaction):
 )
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
     conn = get_guild_db(interaction.guild)  # type: ignore
 
     try:
-        backup_dir = os.path.join(get_guild_dir(interaction.guild), "backups")
+        backup_dir = os.path.join(get_guild_dir(interaction.guild), "backups")  # type: ignore
         os.makedirs(backup_dir, exist_ok=True)
 
         timestamp = int(time.time())
@@ -406,9 +389,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 
     try:
         file_bytes = await file.read()
-        success, message = import_csv_to_db(
-            conn, file_bytes.decode(errors="backslashreplace")
-        )
+        success, message = import_csv_to_db(conn, file_bytes.decode(errors="backslashreplace"))
         await interaction.followup.send(message)
     except Exception as e:
         logging.error(f"database import failed with error: {e}")
@@ -419,17 +400,13 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
                 f"📥 {interaction.user} imported a new verification database.",
                 interaction.guild,
             )
-            logging.info(
-                f"{interaction.user} replaced database for guild: {interaction.guild}"
-            )
+            logging.info(f"{interaction.user} replaced database for guild: {interaction.guild}")
         else:
             await log_admin(
                 f"❌ Database import requested by {interaction.user} failed.",
                 interaction.guild,
             )
-            logging.warning(
-                f"Database import for guild {interaction.guild} failed: {message}"
-            )
+            logging.warning(f"Database import for guild {interaction.guild} failed: {message}")
 
 
 @bot.tree.command(
@@ -438,17 +415,16 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 )
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.bot_has_permissions(send_messages=True)
+@app_commands.guild_only()
 async def send_verify_button(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     try:
-        await interaction.channel.send(
-            "Click here to verify your email.", view=VerifyButtonView()
-        )
+        await interaction.channel.send("Click here to verify your email.", view=VerifyButtonView())  # type: ignore
     except discord.Forbidden:
         await interaction.followup.send(
             "Failed to send verification button. "
             "Does the bot have permissions to send messages in this channel?",
-            ephemeral=True
+            ephemeral=True,
         )
     else:
         await interaction.followup.send("Verification button sent.", ephemeral=True)
@@ -479,12 +455,8 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
 
     if not config.MAILGUN_API_KEY:
-        logging.warning(
-            "No Mailgun API key provided. OTPs will be logged to the console."
-        )
-        print(
-            "WARNING: No Mailgun API key provided. OTPs will be logged to the console."
-        )
+        logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
+        print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
 
     # Register the button view so it keeps working after a restart
     bot.add_view(VerifyButtonView())

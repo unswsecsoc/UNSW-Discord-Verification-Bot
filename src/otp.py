@@ -37,10 +37,11 @@ def send_email_otp(to_email, code):
             "from": config.MAILGUN_FROM,
             "to": [to_email],
             "subject": "Verify your email address",
-            "html": EMAIL_HTML_TEMPLATE
-                    .replace("{{code}}", code)
-                    .replace("{{expiry_mins}}", str(config.OTP_EXPIRY_SECONDS//60)),
-            "text": f"Your verification code is: {code}\nExpires in {config.OTP_EXPIRY_SECONDS//60} minutes.",
+            "html": EMAIL_HTML_TEMPLATE.replace("{{code}}", code).replace(
+                "{{expiry_mins}}", str(config.OTP_EXPIRY_SECONDS // 60)
+            ),
+            "text": f"Your verification code is: {code}\n"
+            f"Expires in {config.OTP_EXPIRY_SECONDS // 60} minutes.",
         },
         timeout=10,
     )

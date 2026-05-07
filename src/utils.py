@@ -1,6 +1,8 @@
 import os
 import sys
+
 import discord
+
 import config
 
 
@@ -29,9 +31,7 @@ async def log_admin(message, guild):
         return
 
     if not channel.permissions_for(guild.me).send_messages:
-        print(
-            f"Missing permission to send messages in #{channel.name}", file=sys.stderr
-        )
+        print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
         return
 
     await channel.send(message)
