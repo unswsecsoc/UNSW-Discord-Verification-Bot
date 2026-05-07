@@ -16,9 +16,9 @@ import config
 from otp import generate_otp, send_email_otp, valid_email_domain
 from utils import log_admin, safe_guild_filename, safe_guild_name
 
-os.makedirs("logs", exist_ok=True)
+os.makedirs(config.LOG_FOLDER, exist_ok=True)
 logging.basicConfig(
-    filename="logs/app.log",
+    filename=os.path.join(config.LOG_FOLDER, "app.log"),
     filemode="a",
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.DEBUG,
@@ -405,7 +405,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 
     try:
         guild_folder = safe_guild_name(interaction.guild)  # type: ignore
-        backup_dir = os.path.join("guild_dbs", "backups", guild_folder)
+        backup_dir = os.path.join(config.DB_FOLDER, "backups", guild_folder)
         os.makedirs(backup_dir, exist_ok=True)
 
         timestamp = int(time.time())
