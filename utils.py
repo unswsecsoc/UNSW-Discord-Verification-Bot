@@ -1,17 +1,24 @@
 import os
-import re
 import sys
 import discord
 import config
 
 
-def safe_guild_name(guild: discord.Guild) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", guild.name)
+def get_guild_dir(guild: discord.Guild):
+    return os.path.join(config.DB_FOLDER, str(guild.id))
 
 
-# TODO: Don't prepend DB_FOLDER here, do that later or rename function
-def safe_guild_filename(guild: discord.Guild):
-    return os.path.join(config.DB_FOLDER, f"{safe_guild_name(guild)}_{guild.id}.db")
+def get_guild_db_path(guild: discord.Guild):
+    return os.path.join(get_guild_dir(guild), "database.db")
+
+
+# store the human-readable guild name in its data directory
+def save_guild_info(guild: discord.Guild) -> None:
+    guild_dir = get_guild_dir(guild)
+    os.makedirs(guild_dir, exist_ok=True)
+    info_file = os.path.join(guild_dir, "guild_name.txt")
+    with open(info_file, "w") as f:
+        f.write(guild.name)
 
 
 async def log_admin(message, guild):

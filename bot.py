@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 import config
 from otp import generate_otp, send_email_otp, valid_email_domain
-from utils import log_admin, safe_guild_filename, safe_guild_name
+from utils import log_admin, get_guild_db_path, get_guild_dir, save_guild_info
 
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
@@ -40,7 +40,8 @@ def get_guild_db(guild: discord.Guild):
     if guild.id in db_connections:
         return db_connections[guild.id]
 
-    path = safe_guild_filename(guild)
+    path = get_guild_db_path(guild)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = sqlite3.connect(path)
     c = conn.cursor()
     c.execute("""
@@ -54,7 +55,10 @@ def get_guild_db(guild: discord.Guild):
     """)
     conn.commit()
     db_connections[guild.id] = conn
-    logging.info(f"created database for guild {guild.id}")
+    logging.info(f"loaded or created database for guild {guild.id}")
+
+    save_guild_info(guild)
+
     return conn
 
 
@@ -343,11 +347,6 @@ class VerifyButtonView(discord.ui.View):
         await interaction.response.send_modal(EmailModal())
 
 
-# TODO: Remove this function since it is redundant.
-def get_guild_db_path(guild: discord.Guild) -> str:
-    return f"{safe_guild_filename(guild)}"
-
-
 def close_guild_db(guild: discord.Guild):
     logging.info(f"closing guild db connection for {guild}")
     gid = guild.id
@@ -391,13 +390,11 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     conn = get_guild_db(interaction.guild)  # type: ignore
 
     try:
-        guild_folder = safe_guild_name(interaction.guild)  # type: ignore
-        backup_dir = os.path.join("guild_dbs", "backups", guild_folder)
+        backup_dir = os.path.join(get_guild_dir(interaction.guild), "backups")
         os.makedirs(backup_dir, exist_ok=True)
 
         timestamp = int(time.time())
-        guild_name = safe_guild_name(interaction.guild)  # type: ignore
-        backup_filename = f"{guild_name}_{interaction.guild.id}_{timestamp}.db.backup"  # type: ignore
+        backup_filename = f"{timestamp}.db.backup"
         backup_path = os.path.join(backup_dir, backup_filename)
 
         with sqlite3.connect(backup_path) as backup_dest_conn:
