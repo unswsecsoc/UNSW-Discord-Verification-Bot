@@ -42,7 +42,7 @@ Follow the instructions in `README.md` on how to initialise your test server.
 
 Pre-commit hooks are managed by `prek`. They can be manually run with `prek run`.
 
-To install pre-commit hooks to automatically run before committing, run `prek install`. This will ensure your commits are correctly formatted etc..
+To install pre-commit hooks to automatically run before committing, run `prek install`. This will ensure your commits are correctly formatted etc.
 
 ## Tooling
 
