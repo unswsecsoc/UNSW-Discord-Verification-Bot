@@ -40,9 +40,9 @@ Follow the instructions in `README.md` on how to initialise your test server.
 
 ### (Optional) Set up pre-commit hooks
 
-Pre-commit hooks are managed by `prek`. They can be manually run with `prek run`.
+Pre-commit hooks are managed by `prek`. They can be manually run with `uv run prek run`.
 
-To install pre-commit hooks to automatically run before committing, run `prek install`. This will ensure your commits are correctly formatted etc.
+To install pre-commit hooks to automatically run before committing, run `uv run prek install`. This will ensure your commits are correctly formatted etc.
 
 ## Tooling
 
@@ -56,4 +56,4 @@ To format your code: `uv run ruff format`.
 
 To type check your code: `uv run ty check`.
 
-To lint, format, and type check staged files: `prek run`.
+To lint, format, and type check staged files: `uv run prek run`.
