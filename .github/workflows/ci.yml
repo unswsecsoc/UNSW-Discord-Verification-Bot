@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v6.5.0
+        with:
+          enable-cache: true
+
+      - name: Install python + dependencies
+        run: uv sync --dev
+
+      - run: uv run ruff format .
+      - run: uv run ruff check .
+      - run: uv run ty check

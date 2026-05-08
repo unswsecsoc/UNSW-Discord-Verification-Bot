@@ -1,11 +1,13 @@
 import os
 import sys
+
 import discord
+
 import config
 
 
 def get_guild_dir(guild: discord.Guild):
-    return os.path.join(config.DB_FOLDER, str(guild.id))
+    return os.path.join(config.DB_DIR, str(guild.id))
 
 
 def get_guild_db_path(guild: discord.Guild):
@@ -29,9 +31,7 @@ async def log_admin(message, guild):
         return
 
     if not channel.permissions_for(guild.me).send_messages:
-        print(
-            f"Missing permission to send messages in #{channel.name}", file=sys.stderr
-        )
+        print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
         return
 
     await channel.send(message)

@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+from pathlib import Path
 
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -15,5 +16,8 @@ OTP_EXPIRY_SECONDS = 600
 OTP_RESEND_COOLDOWN = 120
 OTP_LENGTH = 10
 
-LOG_FOLDER = "logs"
-DB_FOLDER = "guild_dbs"
+project_root = Path(__file__).resolve().parent.parent
+
+LOG_DIR = project_root / "logs"
+DB_DIR = project_root / "guild_dbs"
+TEMPLATES_DIR = project_root / "src" / "templates"
