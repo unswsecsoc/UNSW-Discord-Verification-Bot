@@ -15,6 +15,10 @@ import config
 from export import export_db_to_csv, import_csv_to_db
 from otp import generate_otp, send_email_otp, valid_email_domain
 from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
+import logs
+
+# setup Logfire
+logs.init()
 
 os.makedirs(config.LOG_DIR, exist_ok=True)
 logging.basicConfig(
