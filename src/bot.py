@@ -8,6 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
+import logfire
 from discord import app_commands
 from discord.ext import commands
 
@@ -95,6 +96,7 @@ def get_commands_hash() -> str:
 class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
+    @logfire.instrument(extract_args=["interaction"])
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         email = self.email.value.strip().lower()
@@ -209,6 +211,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 class OTPModal(discord.ui.Modal, title="Enter pin"):
     otp = discord.ui.TextInput(label=f"Enter the {config.OTP_LENGTH}-digit code", required=True)
 
+    @logfire.instrument(extract_args=["interaction"])
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         key = (interaction.guild.id, user_id)  # type: ignore
@@ -337,6 +340,7 @@ def close_guild_db(guild: discord.Guild):
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument()
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
@@ -362,6 +366,7 @@ async def export_db(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument(extract_args=["interaction"])
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
@@ -412,6 +417,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.bot_has_permissions(send_messages=True)
 @app_commands.guild_only()
+@logfire.instrument()
 async def send_verify_button(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     try:
@@ -452,7 +458,6 @@ async def on_ready():
 
     if not config.MAILGUN_API_KEY:
         logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
-        print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
 
     # Register the button view so it keeps working after a restart
     bot.add_view(VerifyButtonView())

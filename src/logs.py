@@ -32,11 +32,11 @@ def init():
 
     # More Logfire stuff
     logfire.instrument_system_metrics()
-
-    def disk_usage_callback(_options: CallbackOptions):
-        usage = psutil.disk_usage("/")
-        yield Observation(usage.percent / 100)
-
     logfire.metric_gauge_callback("system.disk.utilization", [disk_usage_callback])
-
     logfire.instrument_sqlite3()
+    logfire.instrument_pydantic()
+
+
+def disk_usage_callback(_options: CallbackOptions):
+    usage = psutil.disk_usage("/")
+    yield Observation(usage.percent / 100)
