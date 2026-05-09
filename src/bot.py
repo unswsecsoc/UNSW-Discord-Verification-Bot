@@ -293,8 +293,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
         # role hierarchy check
         if role >= bot_member.top_role:
             await log_admin(
-                "❌ Bot cannot assign role because it is higher than or equal to the bot's top"
-                "role.",
+                "❌ Bot cannot assign role: it is higher than or equal to the bot's top role.",
                 interaction.guild,
             )
             await interaction.response.send_message(
