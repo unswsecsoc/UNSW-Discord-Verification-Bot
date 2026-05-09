@@ -15,7 +15,7 @@ from discord.ext import commands
 import config
 import logs
 from export import export_db_to_csv, import_csv_to_db
-from otp import generate_otp, send_email_otp, valid_email_domain
+from otp import generate_otp, redact_email, send_email_otp, valid_email_domain
 from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
 
 # setup Logfire
@@ -167,7 +167,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         if not valid_email_domain(email):
             await interaction.response.send_message("❌ Email domain not allowed.", ephemeral=True)
             await log_admin(
-                f"🚫 {interaction.user} tried invalid domain: {email}",
+                f"🚫 {interaction.user} tried invalid domain: {redact_email(email)}",
                 interaction.guild,
             )
             return
@@ -199,7 +199,9 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             await interaction.response.send_message(
                 "📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True
             )
-            await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
+            await log_admin(
+                f"📨 OTP sent to {redact_email(email)} for {interaction.user}", interaction.guild
+            )
         else:
             # Could be an actual issue but could also just be that an invalid email was entered.
             # If its an actual issue, then we might have run out of API usage this month.
@@ -307,7 +309,10 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
         logging.info(f"verified user {interaction.user}")
-        await log_admin(f"✅ {interaction.user} verified with {record['email']}", interaction.guild)
+        await log_admin(
+            f"✅ {interaction.user} verified with {redact_email(record['email'])}",
+            interaction.guild,
+        )
 
 
 class OTPView(discord.ui.View):

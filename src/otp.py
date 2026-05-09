@@ -21,6 +21,11 @@ def valid_email_domain(email):
     return domain in config.ALLOWED_DOMAINS
 
 
+def redact_email(email: str):
+    _, domain = email.split("@", maxsplit=1)
+    return rf"\*\*\*\*\*@{domain}"
+
+
 def send_email_otp(to_email, code):
     if not config.MAILGUN_API_KEY:
         print(f"OTP for {to_email}: {code}")
