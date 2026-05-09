@@ -15,7 +15,7 @@ from discord.ext import commands
 import config
 import logs
 from export import export_db_to_csv, import_csv_to_db
-from otp import generate_otp, redact_email, send_email_otp, valid_email_domain
+from otp import generate_otp, match_email, redact_email, send_email_otp, valid_email_domain
 from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
 
 # setup Logfire
@@ -164,10 +164,18 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 
             return
 
+        if not match_email(email):
+            await interaction.response.send_message("❌ Invalid email format.", ephemeral=True)
+            return
+
         if not valid_email_domain(email):
-            await interaction.response.send_message("❌ Email domain not allowed.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Email domain not allowed. Allowed domains:"
+                + "".join(f"\n- `@{domain}`" for domain in config.ALLOWED_DOMAINS),
+                ephemeral=True,
+            )
             await log_admin(
-                f"🚫 {interaction.user} tried invalid domain: {redact_email(email)}",
+                f"🚫 {interaction.user} tried a non-allowed domain: {redact_email(email)}",
                 interaction.guild,
             )
             return
