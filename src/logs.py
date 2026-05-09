@@ -11,7 +11,7 @@ import config
 
 def init():
     # Logfire handler
-    logfire.configure()
+    logfire.configure(service_name="bot", environment=config.ENVIRONMENT)
     logfire_handler = logfire.LogfireLoggingHandler()
 
     # File handler
