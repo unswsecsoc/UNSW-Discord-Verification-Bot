@@ -410,35 +410,6 @@ wheels = [
 ]
 
 [[package]]
-name = "opentelemetry-instrumentation-dbapi"
-version = "0.61b0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-semantic-conventions" },
-    { name = "wrapt" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d6/ed/ba91c9e4a3ec65781e9c59982109f0a36de9fa574f622596b33d1985dab5/opentelemetry_instrumentation_dbapi-0.61b0.tar.gz", hash = "sha256:02fa800682c1de87dcad0e59f2092b3b6fb8b8ea0636518f989e1166b418dcb9", size = 16761, upload-time = "2026-03-04T14:20:29.782Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/a5/d26c68f3fd33eb7410985cef7700bb426e2c4a26de9207902cbbffb19a3f/opentelemetry_instrumentation_dbapi-0.61b0-py3-none-any.whl", hash = "sha256:8f762c39c8edd20c6aef3282550a2cfbfec76c3f431bf5c36327dcf9ece2e5a0", size = 14134, upload-time = "2026-03-04T14:19:24.718Z" },
-]
-
-[[package]]
-name = "opentelemetry-instrumentation-sqlite3"
-version = "0.61b0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-instrumentation-dbapi" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/86/92/0d561326bf4026817abef097ec6be3ae7a86dd02d64e1a80c2218057a999/opentelemetry_instrumentation_sqlite3-0.61b0.tar.gz", hash = "sha256:96d4f0fa35ba7ee9aa683aa17726cb358c8029cc7b3cf55668ccc77254c29ca5", size = 7933, upload-time = "2026-03-04T14:20:48.301Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/76/a8/4454bd16b3cd7edebc71327c3c4946e7bf969e8fcd8fe5581d9f5d92ec2d/opentelemetry_instrumentation_sqlite3-0.61b0-py3-none-any.whl", hash = "sha256:202a18e7f9d231bfa44771fdb068bff16f24a6fa5e424a0df4d9232b1a818693", size = 9341, upload-time = "2026-03-04T14:19:54.426Z" },
-]
-
-[[package]]
 name = "opentelemetry-instrumentation-system-metrics"
 version = "0.61b0"
 source = { registry = "https://pypi.org/simple" }
@@ -777,7 +748,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "discord-py" },
     { name = "logfire", extra = ["system-metrics"] },
-    { name = "opentelemetry-instrumentation-sqlite3" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "requests" },
@@ -794,7 +764,6 @@ dev = [
 requires-dist = [
     { name = "discord-py", specifier = "==2.6.4" },
     { name = "logfire", extras = ["system-metrics"], specifier = ">=4.32.1" },
-    { name = "opentelemetry-instrumentation-sqlite3", specifier = ">=0.61b0" },
     { name = "pydantic", specifier = "==2.12.5" },
     { name = "python-dotenv", specifier = "==1.2.1" },
     { name = "requests", specifier = "==2.32.5" },
