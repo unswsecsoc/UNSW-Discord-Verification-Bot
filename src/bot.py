@@ -106,20 +106,24 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         logging.info(f"{interaction.user} is attempting to verify")
 
         # Check DB if already verified
-        conn = get_guild_db(interaction.guild)  # type: ignore Bot can only run in a guild
+        conn = get_guild_db(interaction.guild)  # type: ignore
         c = conn.cursor()
         c.execute("SELECT verified, email FROM users WHERE discord_id=?", (user_id,))
         row = c.fetchone()
 
         if row and row[0] == 1:
             guild = interaction.guild
-            member = guild.get_member(user_id)  # type: ignore Bot can only run in a guild
+            member = guild.get_member(user_id)  # type: ignore
             bot_member = guild.get_member(bot.user.id)  # type: ignore
             role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)  # type: ignore
 
             if not member or not role or not bot_member:
+                await log_admin(
+                    "❌ Bot is unable to check member roles",
+                    interaction.guild,
+                )
                 await interaction.response.send_message(
-                    "⚠️ You are verified but I couldn't check roles. Contact an admin.",
+                    "⚠️ You are verified but I couldn't check roles.",
                     ephemeral=True,
                 )
                 return
@@ -133,6 +137,10 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 
             # Role missing — try to restore it
             if not guild.me.guild_permissions.manage_roles:  # type: ignore
+                await log_admin(
+                    "❌ Bot doesn't have `Manage Roles` permission",
+                    interaction.guild,
+                )
                 await interaction.response.send_message(
                     "⚠️ You're verified but I don't have permission to restore your role.",
                     ephemeral=True,
@@ -140,6 +148,10 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
                 return
 
             if role >= bot_member.top_role:
+                await log_admin(
+                    "❌ Bot cannot assign role: it is higher than or equal to the bot's top role.",
+                    interaction.guild,
+                )
                 await interaction.response.send_message(
                     "⚠️ You're verified but my role is too low to re-assign yours.",
                     ephemeral=True,
@@ -238,7 +250,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             return
 
         # Success — store in DB
-        conn = get_guild_db(interaction.guild)  # type: ignore Bot can only run in a guild
+        conn = get_guild_db(interaction.guild)  # type: ignore
         c = conn.cursor()
         c.execute(
             """
@@ -280,6 +292,11 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         # role hierarchy check
         if role >= bot_member.top_role:
+            await log_admin(
+                "❌ Bot cannot assign role because it is higher than or equal to the bot's top"
+                "role.",
+                interaction.guild,
+            )
             await interaction.response.send_message(
                 "❌ Bot cannot assign this role because it is higher than "
                 "or equal to the bot's top role.",
