@@ -400,6 +400,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         await interaction.followup.send(
             "❌ Import failed - failed to create a backup before importing"
         )
+        return
 
     try:
         file_bytes = await file.read()
