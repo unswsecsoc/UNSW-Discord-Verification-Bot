@@ -3,6 +3,8 @@ import os
 from datetime import datetime
 
 import logfire
+import psutil
+from opentelemetry.metrics import CallbackOptions, Observation
 
 import config
 
@@ -27,3 +29,14 @@ def init():
     logger.setLevel(logging.INFO)
     logger.addHandler(file_handler)
     logger.addHandler(logfire_handler)
+
+    # More Logfire stuff
+    logfire.instrument_system_metrics()
+
+    def disk_usage_callback(_options: CallbackOptions):
+        usage = psutil.disk_usage("/")
+        yield Observation(usage.percent / 100)
+
+    logfire.metric_gauge_callback("system.disk.utilization", [disk_usage_callback])
+
+    logfire.instrument_sqlite3()
