@@ -12,21 +12,13 @@ from discord import app_commands
 from discord.ext import commands
 
 import config
+import logs
 from export import export_db_to_csv, import_csv_to_db
 from otp import generate_otp, send_email_otp, valid_email_domain
 from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
-import logs
 
 # setup Logfire
 logs.init()
-
-os.makedirs(config.LOG_DIR, exist_ok=True)
-logging.basicConfig(
-    filename=os.path.join(config.LOG_DIR, "app.log"),
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG,
-)
 
 os.makedirs(config.DB_DIR, exist_ok=True)
 
@@ -466,4 +458,4 @@ async def on_ready():
     bot.add_view(VerifyButtonView())
 
 
-bot.run(config.DISCORD_TOKEN)
+bot.run(config.DISCORD_TOKEN, log_handler=None)
