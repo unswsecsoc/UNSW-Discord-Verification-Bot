@@ -147,10 +147,9 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         if row and row[0] == 1:
             guild = interaction.guild
             member = guild.get_member(user_id)
-            bot_member = guild.get_member(bot.user.id)  # type: ignore
             role = get_verified_role(guild)
 
-            if not member or not role or not bot_member:
+            if not member or not role:
                 await log_admin(
                     "❌ Bot is unable to check member roles",
                     interaction.guild,
@@ -180,7 +179,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
                 )
                 return
 
-            if role >= bot_member.top_role:
+            if role >= guild.me.top_role:
                 await log_admin(
                     "❌ Bot cannot assign role: it is higher than or equal to the bot's top role.",
                     interaction.guild,
@@ -311,9 +310,8 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         guild = interaction.guild
         member = interaction.guild.get_member(interaction.user.id)  # type: ignore
-        bot_member = guild.get_member(bot.user.id)  # type: ignore
 
-        if not guild or not member or not bot_member:
+        if not guild or not member:
             await interaction.response.send_message(
                 "❌ Verification failed (server state error).", ephemeral=True
             )
@@ -335,7 +333,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             return
 
         # role hierarchy check
-        if role >= bot_member.top_role:
+        if role >= guild.me.top_role:
             await log_admin(
                 "❌ Bot cannot assign role: it is higher than or equal to the bot's top role.",
                 interaction.guild,
@@ -505,8 +503,7 @@ async def set_verified_role_cmd(interaction: discord.Interaction, role: discord.
 
     await interaction.response.defer(ephemeral=True)
 
-    bot_member = interaction.guild.get_member(bot.user.id)  # type: ignore
-    if role >= bot_member.top_role:  # type: ignore
+    if role >= interaction.guild.me.top_role:
         await interaction.followup.send(
             "❌ That role is not lower in the role hierarchy than the bot's top role.",
             ephemeral=True,
@@ -531,6 +528,61 @@ async def set_verified_role_cmd(interaction: discord.Interaction, role: discord.
             "❌ Failed to set verified role.",
             ephemeral=True,
         )
+
+
+@bot.tree.command(
+    name="check-setup",
+    description="Check the configuration of the bot",
+)
+@app_commands.default_permissions(administrator=True)
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
+@logfire.instrument()
+async def check_setup(interaction: discord.Interaction):
+    assert interaction.guild is not None
+
+    await interaction.response.defer(ephemeral=True)
+
+    guild = interaction.guild
+    results = []
+
+    # Verified role is set
+    verified_role = get_verified_role(guild)
+    if verified_role:
+        results.append(f"✅ Verified role is set ({verified_role.mention})")
+    else:
+        results.append("❌ Verified role is not set")
+
+    # Verified role is lower than bot's top role
+    if verified_role:
+        if verified_role < guild.me.top_role:
+            results.append("✅ Verified role is lower than bot's top role")
+        else:
+            results.append("❌ Verified role is higher than bot's top role")
+
+    # Bot has Manage Roles permission
+    if guild.me.guild_permissions.manage_roles:
+        results.append("✅ Bot has `Manage Roles` permission")
+    else:
+        results.append("❌ Bot lacks `Manage Roles` permission")
+
+    # Verification logs channel exists
+    logs_channel = discord.utils.get(guild.text_channels, name="verification-logs")
+    if logs_channel:
+        results.append("✅ `#verification-logs` channel exists")
+    else:
+        results.append("❌ `#verification-logs` channel not found")
+
+    # Bot can send messages in logs channel
+    if logs_channel:
+        if logs_channel.permissions_for(guild.me).send_messages:
+            results.append("✅ Bot can send messages in `#verification-logs`")
+        else:
+            results.append("❌ Bot cannot send messages in `#verification-logs`")
+
+    await interaction.followup.send(
+        "\n".join(results), ephemeral=True, allowed_mentions=discord.AllowedMentions(roles=False)
+    )
 
 
 # Runs once on initial startup
