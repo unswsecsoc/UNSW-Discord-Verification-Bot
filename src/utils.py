@@ -1,5 +1,5 @@
+import logging
 import os
-import sys
 
 import discord
 import logfire
@@ -26,15 +26,15 @@ def save_guild_info(guild: discord.Guild) -> None:
 
 async def log_admin(message, guild, **kwargs):
     logfire.debug(f'log_admin: logging "{message}" to guild {guild.id}')
-  
+
     channel = discord.utils.get(guild.text_channels, name="verification-logs")
 
     if channel is None:
-        print(f"No #verification-logs channel in guild {guild.name}", file=sys.stderr)
+        logging.info(f"No #verification-logs channel in guild {guild.name}")
         return
 
     if not channel.permissions_for(guild.me).send_messages:
-        print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
+        logging.info(f"Missing permission to send messages in #{channel.name}")
         return
 
     await channel.send(message, **kwargs)
