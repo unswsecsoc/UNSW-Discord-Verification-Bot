@@ -13,7 +13,7 @@ See images of the verification process in `images` folder.
 4. Run `/set-verified-role @verified`
 5. Create a `#verify` text channel
 6. Run `/send-verify-button` in `#verify`
-7. Profit!?
+7. Run `/check-setup` to make sure everything is set up correctly
 
 Once these steps are complete users will be able to verify by clicking the `Verify Email` button.
 
