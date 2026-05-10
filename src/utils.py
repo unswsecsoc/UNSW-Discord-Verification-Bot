@@ -23,7 +23,7 @@ def save_guild_info(guild: discord.Guild) -> None:
         f.write(guild.name)
 
 
-async def log_admin(message, guild):
+async def log_admin(message, guild, **kwargs):
     channel = discord.utils.get(guild.text_channels, name="verification-logs")
 
     if channel is None:
@@ -34,4 +34,4 @@ async def log_admin(message, guild):
         print(f"Missing permission to send messages in #{channel.name}", file=sys.stderr)
         return
 
-    await channel.send(message)
+    await channel.send(message, **kwargs)

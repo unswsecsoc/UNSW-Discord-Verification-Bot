@@ -54,6 +54,12 @@ def get_guild_db(guild: discord.Guild):
             CHECK ((verified_at IS NULL) OR verified) -- verified_at implies verified
         ) STRICT
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        ) STRICT
+    """)
     conn.commit()
     db_connections[guild.id] = conn
     logging.info(f"loaded or created database for guild {guild.id}")
@@ -61,6 +67,33 @@ def get_guild_db(guild: discord.Guild):
     save_guild_info(guild)
 
     return conn
+
+
+def get_verified_role(guild: discord.Guild) -> discord.Role | None:
+    conn = get_guild_db(guild)
+    c = conn.cursor()
+    c.execute("SELECT value FROM config WHERE key = 'verified_role_id'")
+    row = c.fetchone()
+
+    if row is None:
+        return None
+
+    role_id = int(row[0])
+    return guild.get_role(role_id)
+
+
+def set_verified_role(guild: discord.Guild, role: discord.Role) -> None:
+    conn = get_guild_db(guild)
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO config (key, value)
+        VALUES ('verified_role_id', ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+    """,
+        (str(role.id),),
+    )
+    conn.commit()
 
 
 # Active OTP dictionary
@@ -100,22 +133,24 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
     async def on_submit(self, interaction: discord.Interaction):
+        assert interaction.guild is not None
+
         user_id = interaction.user.id
         email = self.email.value.strip().lower()
 
         logging.info(f"{interaction.user} is attempting to verify")
 
         # Check DB if already verified
-        conn = get_guild_db(interaction.guild)  # type: ignore
+        conn = get_guild_db(interaction.guild)
         c = conn.cursor()
         c.execute("SELECT verified, email FROM users WHERE discord_id=?", (user_id,))
         row = c.fetchone()
 
         if row and row[0] == 1:
             guild = interaction.guild
-            member = guild.get_member(user_id)  # type: ignore
+            member = guild.get_member(user_id)
             bot_member = guild.get_member(bot.user.id)  # type: ignore
-            role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)  # type: ignore
+            role = get_verified_role(guild)
 
             if not member or not role or not bot_member:
                 await log_admin(
@@ -136,7 +171,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
                 return
 
             # Role missing — try to restore it
-            if not guild.me.guild_permissions.manage_roles:  # type: ignore
+            if not guild.me.guild_permissions.manage_roles:
                 await log_admin(
                     "❌ Bot doesn't have `Manage Roles` permission",
                     interaction.guild,
@@ -187,7 +222,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             return
 
         now = time.time()
-        key = (interaction.guild.id, user_id)  # type: ignore
+        key = (interaction.guild.id, user_id)
         record = pending_verifications.get(key)
 
         if record and now - record["last_sent"] < config.OTP_RESEND_COOLDOWN:
@@ -198,7 +233,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             return
 
         code = generate_otp()
-        key = (interaction.guild.id, user_id)  # type: ignore
+        key = (interaction.guild.id, user_id)
         pending_verifications[key] = {
             "code": code,
             "expires": now + config.OTP_EXPIRY_SECONDS,
@@ -275,7 +310,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             )
             return
 
-        role = discord.utils.get(guild.roles, name=config.VERIFIED_ROLE_NAME)
+        role = get_verified_role(guild)
 
         if not role:
             await interaction.response.send_message(
@@ -315,10 +350,6 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
                 "❌ Discord API error. Try again later.", ephemeral=True
             )
             return
-
-        role = discord.utils.get(interaction.guild.roles, name=config.VERIFIED_ROLE_NAME)  # type: ignore
-        if role:
-            await interaction.user.add_roles(role)  # type: ignore
 
         del pending_verifications[key]
 
@@ -444,6 +475,46 @@ async def send_verify_button(interaction: discord.Interaction):
         )
     else:
         await interaction.followup.send("Verification button sent.", ephemeral=True)
+
+
+@bot.tree.command(
+    name="set-verified-role",
+    description="Set the role to assign to verified members",
+)
+@app_commands.default_permissions(administrator=True)
+@app_commands.checks.has_permissions(administrator=True)
+@app_commands.guild_only()
+async def set_verified_role_cmd(interaction: discord.Interaction, role: discord.Role):
+    assert interaction.guild is not None
+
+    await interaction.response.defer(ephemeral=True)
+
+    bot_member = interaction.guild.get_member(bot.user.id)  # type: ignore
+    if role >= bot_member.top_role:  # type: ignore
+        await interaction.followup.send(
+            "❌ That role is not lower in the role hierarchy than the bot's top role.",
+            ephemeral=True,
+        )
+        return
+
+    try:
+        set_verified_role(interaction.guild, role)
+        await interaction.followup.send(
+            f"✅ Verified role set to {role.mention}",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+        await log_admin(
+            f"🔧 {interaction.user} set verified role to {role.mention}",
+            interaction.guild,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+    except Exception as e:
+        logging.error(f"Failed to set verified role: {e}")
+        await interaction.followup.send(
+            "❌ Failed to set verified role.",
+            ephemeral=True,
+        )
 
 
 # Runs once on initial startup

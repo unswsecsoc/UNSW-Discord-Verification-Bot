@@ -7,12 +7,13 @@ It is designed to be as simple as possible to implement in any UNSW society as q
 See images of the verification process in `images` folder.
 
 ## Setup
-1. Create a server role called `verified` which grants users access to server channels
+1. Invite the discord bot to the server and grant requested permissions ([secso.cc/verificationbot](http://secso.cc/verificationbot))
 2. Create an admin-only `#verification-logs` text channel
-3. Create a `#verify` text channel
-4. Invite the discord bot to the server and grant requested permissions ([secso.cc/verificationbot](http://secso.cc/verificationbot))
-5. Run `/send-verify-button` in `#verify`
-5. Profit!?
+3. Create a server role called `verified` which grants users access to server channels
+4. Run `/set-verified-role @verified`
+5. Create a `#verify` text channel
+6. Run `/send-verify-button` in `#verify`
+7. Profit!?
 
 Once these steps are complete users will be able to verify by clicking the `Verify Email` button.
 
@@ -37,6 +38,9 @@ discord_id,email,verified,verified_at
 Every row must contain at least a `discord_id` and `email`. If `verified` is omitted it will default to 0 (false). Optionally, you may also add an informational `verified_at` value which stores the time of verification in unix seconds.
 
 You may find it useful to utilise a Python script to migrate your current configuration to a CSV. Feel free to contact `projects@unswsecurity.com` for help.
+
+### Using an existing role
+If you already have a role for verified users, you don't have to create a new one. You can set that role as the one used by the bot with `/set-verified-role <role>`.
 
 ## Why this bot
 At the time of writing, this bot provides many benefits over other bots with the same aim:
