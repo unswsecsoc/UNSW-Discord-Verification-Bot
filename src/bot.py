@@ -607,7 +607,7 @@ async def setup_hook():
 # Runs each time bot reconnects to a server
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    logging.info(f"Logged in as {bot.user}")
 
     if not config.MAILGUN_API_KEY:
         logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")

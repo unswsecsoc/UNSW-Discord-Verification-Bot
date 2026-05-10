@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 
@@ -33,6 +34,7 @@ def redact_email(email: str):
 def send_email_otp(to_email, code):
     if not config.MAILGUN_API_KEY:
         print(f"OTP for {to_email}: {code}")
+        logging.info("Printed OTP to console")
 
         class MockResponse:
             status_code = 200
