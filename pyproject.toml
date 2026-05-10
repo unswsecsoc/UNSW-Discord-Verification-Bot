@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "discord.py==2.6.4",
+    "logfire[system-metrics]>=4.32.1",
     "pydantic==2.12.5",
     "python-dotenv==1.2.1",
     "requests==2.32.5",

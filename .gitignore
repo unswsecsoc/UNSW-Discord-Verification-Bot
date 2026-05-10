@@ -2,6 +2,7 @@
 guild_dbs/
 logs/
 cmd_hash.txt
+.logfire/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

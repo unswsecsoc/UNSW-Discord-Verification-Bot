@@ -8,21 +8,18 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import discord
+import logfire
 from discord import app_commands
 from discord.ext import commands
 
 import config
+import logs
 from export import export_db_to_csv, import_csv_to_db
-from otp import generate_otp, send_email_otp, valid_email_domain
+from otp import generate_otp, match_email, redact_email, send_email_otp, valid_email_domain
 from utils import get_guild_db_path, get_guild_dir, log_admin, save_guild_info
 
-os.makedirs(config.LOG_DIR, exist_ok=True)
-logging.basicConfig(
-    filename=os.path.join(config.LOG_DIR, "app.log"),
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG,
-)
+# setup Logfire
+logs.init()
 
 os.makedirs(config.DB_DIR, exist_ok=True)
 
@@ -132,6 +129,7 @@ def get_commands_hash() -> str:
 class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
+    @logfire.instrument(extract_args=["interaction"])
     async def on_submit(self, interaction: discord.Interaction):
         assert interaction.guild is not None
 
@@ -213,10 +211,18 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 
             return
 
+        if not match_email(email):
+            await interaction.response.send_message("❌ Invalid email format.", ephemeral=True)
+            return
+
         if not valid_email_domain(email):
-            await interaction.response.send_message("❌ Email domain not allowed.", ephemeral=True)
+            await interaction.response.send_message(
+                "❌ Email domain not allowed. Allowed domains:"
+                + "".join(f"\n- `@{domain}`" for domain in config.ALLOWED_DOMAINS),
+                ephemeral=True,
+            )
             await log_admin(
-                f"🚫 {interaction.user} tried invalid domain: {email}",
+                f"🚫 {interaction.user} tried a non-allowed domain: {redact_email(email)}",
                 interaction.guild,
             )
             return
@@ -248,7 +254,9 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
             await interaction.response.send_message(
                 "📧 OTP sent! Click below to enter it.", view=OTPView(), ephemeral=True
             )
-            await log_admin(f"📨 OTP sent to {email} for {interaction.user}", interaction.guild)
+            await log_admin(
+                f"📨 OTP sent to {redact_email(email)} for {interaction.user}", interaction.guild
+            )
         else:
             # Could be an actual issue but could also just be that an invalid email was entered.
             # If its an actual issue, then we might have run out of API usage this month.
@@ -260,6 +268,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 class OTPModal(discord.ui.Modal, title="Enter pin"):
     otp = discord.ui.TextInput(label=f"Enter the {config.OTP_LENGTH}-digit code", required=True)
 
+    @logfire.instrument(extract_args=["interaction"])
     async def on_submit(self, interaction: discord.Interaction):
         user_id = interaction.user.id
         key = (interaction.guild.id, user_id)  # type: ignore
@@ -355,7 +364,10 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
         logging.info(f"verified user {interaction.user}")
-        await log_admin(f"✅ {interaction.user} verified with {record['email']}", interaction.guild)
+        await log_admin(
+            f"✅ {interaction.user} verified with {redact_email(record['email'])}",
+            interaction.guild,
+        )
 
 
 class OTPView(discord.ui.View):
@@ -388,6 +400,7 @@ def close_guild_db(guild: discord.Guild):
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument()
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
@@ -413,6 +426,7 @@ async def export_db(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)  # need to be admin
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument(extract_args=["interaction"])
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
@@ -433,6 +447,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
         await interaction.followup.send(
             "❌ Import failed - failed to create a backup before importing"
         )
+        return
 
     try:
         file_bytes = await file.read()
@@ -463,6 +478,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.bot_has_permissions(send_messages=True)
 @app_commands.guild_only()
+@logfire.instrument()
 async def send_verify_button(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     try:
@@ -543,10 +559,9 @@ async def on_ready():
 
     if not config.MAILGUN_API_KEY:
         logging.warning("No Mailgun API key provided. OTPs will be logged to the console.")
-        print("WARNING: No Mailgun API key provided. OTPs will be logged to the console.")
 
     # Register the button view so it keeps working after a restart
     bot.add_view(VerifyButtonView())
 
 
-bot.run(config.DISCORD_TOKEN)
+bot.run(config.DISCORD_TOKEN, log_handler=None)

@@ -20,3 +20,5 @@ project_root = Path(__file__).resolve().parent.parent
 LOG_DIR = project_root / "logs"
 DB_DIR = project_root / "guild_dbs"
 TEMPLATES_DIR = project_root / "src" / "templates"
+
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "local")  # local/dev/prod

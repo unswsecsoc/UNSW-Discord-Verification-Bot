@@ -2,6 +2,7 @@ import os
 import sys
 
 import discord
+import logfire
 
 import config
 
@@ -24,6 +25,8 @@ def save_guild_info(guild: discord.Guild) -> None:
 
 
 async def log_admin(message, guild, **kwargs):
+    logfire.debug(f'log_admin: logging "{message}" to guild {guild.id}')
+  
     channel = discord.utils.get(guild.text_channels, name="verification-logs")
 
     if channel is None:

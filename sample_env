@@ -1,7 +1,18 @@
 # Modify the values and save this file as .env
+
+# Discord
 DISCORD_TOKEN=YOUR_BOT_TOKEN
+
+# Configs
+ALLOWED_EMAIL_DOMAINS=unsw.edu.au,student.unsw.edu.au,ad.unsw.edu.au
+# local/dev/prod
+ENVIRONMENT=local
+
+# Mailgun (optional for local testing)
 MAILGUN_API_KEY=
 MAILGUN_DOMAIN=yourdomain.com
 MAILGUN_FROM=Verification Bot <verify@yourdomain.com>
 VERIFIED_ROLE_NAME=verified
-ALLOWED_EMAIL_DOMAINS=unsw.edu.au,student.unsw.edu.au,ad.unsw.edu.au
+
+# Logfire (optional)
+LOGFIRE_TOKEN=

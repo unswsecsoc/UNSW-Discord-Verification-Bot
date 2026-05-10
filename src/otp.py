@@ -13,12 +13,21 @@ def generate_otp():
     return "".join(secrets.token_hex(nbytes=config.OTP_LENGTH // 2).upper())
 
 
+def match_email(email):
+    return re.match(r"[^@]+@([^@]+\.[^@]+)", email)
+
+
 def valid_email_domain(email):
-    match = re.match(r"[^@]+@([^@]+\.[^@]+)", email)
+    match = match_email(email)
     if not match:
         return False
     domain = match.group(1).lower()
     return domain in config.ALLOWED_DOMAINS
+
+
+def redact_email(email: str):
+    _, domain = email.split("@", maxsplit=1)
+    return rf"\*\*\*\*\*@{domain}"
 
 
 def send_email_otp(to_email, code):
