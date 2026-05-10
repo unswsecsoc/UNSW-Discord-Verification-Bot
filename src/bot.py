@@ -40,7 +40,7 @@ pending_verifications = {}
 
 
 def is_verified(member: discord.Member) -> bool:
-    # Check DB if already verified
+    """Checks if a user is verified in the DB."""
     conn = get_guild_db(member.guild)
     c = conn.cursor()
     c.execute("SELECT verified, email FROM users WHERE discord_id=?", (member.id,))
@@ -48,12 +48,9 @@ def is_verified(member: discord.Member) -> bool:
     return row is not None and row[0] == 1
 
 
-async def grant_verified_role(interaction: discord.Interaction) -> str | None:
-    assert interaction.guild is not None
-    assert isinstance(interaction.user, discord.Member)
-
-    guild = interaction.guild
-    member = interaction.user
+async def grant_verified_role(member: discord.Member) -> str | None:
+    """Grants the verified role to a member. Returns an error message, or None on success."""
+    guild = member.guild
 
     role = get_verified_role(guild)
 
@@ -68,7 +65,7 @@ async def grant_verified_role(interaction: discord.Interaction) -> str | None:
     if role >= guild.me.top_role:
         await log_admin(
             "❌ Bot cannot assign role: it is higher than or equal to the bot's top role.",
-            interaction.guild,
+            guild,
         )
         return (
             "❌ Bot cannot assign the verified role because it is higher than"
@@ -85,18 +82,15 @@ async def grant_verified_role(interaction: discord.Interaction) -> str | None:
     return None
 
 
-async def restore_verified_role(interaction: discord.Interaction) -> str:
-    assert interaction.guild is not None
-    assert isinstance(interaction.user, discord.Member)
-
-    guild = interaction.guild
-    member = interaction.user
+async def restore_verified_role(member: discord.Member) -> str:
+    """Re-grants the verified role to a member. Returns a success/error message."""
+    guild = member.guild
     role = get_verified_role(guild)
 
     if not role:
         await log_admin(
             "❌ Bot is unable to check member roles",
-            interaction.guild,
+            guild,
         )
         return "⚠️ You are verified but I couldn't check roles."
 
@@ -105,8 +99,8 @@ async def restore_verified_role(interaction: discord.Interaction) -> str:
         return "✅ You are already verified."
 
     # Role missing - try to restore it
-    await log_admin(f"♻️ Restoring verified role for {interaction.user}", guild)
-    err = await grant_verified_role(interaction)
+    await log_admin(f"♻️ Restoring verified role for {member}", guild)
+    err = await grant_verified_role(member)
     if err is not None:
         return "🔁 You were already verified but I couldn't restore your role:\n" + err
     return "🔁 You were already verified - I've restored your role."
@@ -126,7 +120,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
         logging.info(f"{interaction.user} is attempting to verify")
 
         if is_verified(interaction.user):
-            msg = await restore_verified_role(interaction)
+            msg = await restore_verified_role(interaction.user)
             await interaction.response.send_message(msg, ephemeral=True)
             return
 
@@ -191,6 +185,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
     @logfire.instrument(extract_args=["interaction"])
     async def on_submit(self, interaction: discord.Interaction):
         assert interaction.guild is not None
+        assert isinstance(interaction.user, discord.Member)
 
         user_id = interaction.user.id
         key = (interaction.guild.id, user_id)
@@ -231,7 +226,7 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
         )
         conn.commit()
 
-        err = await grant_verified_role(interaction)
+        err = await grant_verified_role(interaction.user)
         if err is not None:
             await interaction.response.send_message(err, ephemeral=True)
             return
@@ -263,7 +258,7 @@ class VerifyButtonView(discord.ui.View):
         assert isinstance(interaction.user, discord.Member)
 
         if is_verified(interaction.user):
-            msg = await restore_verified_role(interaction)
+            msg = await restore_verified_role(interaction.user)
             await interaction.response.send_message(msg, ephemeral=True)
             return
 
