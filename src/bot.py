@@ -360,6 +360,7 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     await interaction.response.defer(ephemeral=True)
 
     if file.size > config.IMPORT_MAX_SIZE_MB * 1024 * 1024:
+        logging.info(f"Rejected file for being too large ({file.size} bytes)")
         await interaction.followup.send(
             f"❌ File too large. Maximum size is {config.IMPORT_MAX_SIZE_MB}MB."
         )
