@@ -348,7 +348,6 @@ async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     description="Send a verification button to this channel",
 )
 @app_commands.default_permissions(administrator=True)
-@app_commands.checks.bot_has_permissions(send_messages=True)
 @app_commands.guild_only()
 @logfire.instrument()
 async def send_verify_button(interaction: discord.Interaction):
