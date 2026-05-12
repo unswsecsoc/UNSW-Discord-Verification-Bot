@@ -51,8 +51,14 @@ async def on_app_command_error(
             f"⏳ This command is on cooldown. Try again in {retry_after} seconds.",
             ephemeral=True,
         )
+    elif isinstance(error, app_commands.MissingPermissions):
+        logging.info("Rejecting command due to insufficient user permissions")
+        await interaction.response.send_message(
+            "❌ You have insufficient permissions to run this command.",
+            ephemeral=True,
+        )
     else:
-        logging.error(f"Command error: {error}")
+        logging.error(f"App command error in {interaction}", exc_info=error)
         await interaction.response.send_message(
             "❌ An error occurred while processing your command.",
             ephemeral=True,
