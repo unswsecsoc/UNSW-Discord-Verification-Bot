@@ -44,21 +44,22 @@ pending_verifications = {}
 async def on_app_command_error(
     interaction: discord.Interaction, error: app_commands.AppCommandError
 ):
+    cmd_name = f"/{interaction.command.name}" if interaction.command else "(unknown interaction)"
     if isinstance(error, app_commands.CommandOnCooldown):
         retry_after = int(error.retry_after)
-        logging.info(f"Rate limiting {interaction.user} for {retry_after} seconds")
+        logging.info(f"Rate limiting {cmd_name} for {interaction.user} for {retry_after} seconds")
         await interaction.response.send_message(
             f"⏳ This command is on cooldown. Try again in {retry_after} seconds.",
             ephemeral=True,
         )
     elif isinstance(error, app_commands.MissingPermissions):
-        logging.info("Rejecting command due to insufficient user permissions")
+        logging.info(f"Rejecting command {cmd_name} due to insufficient user permissions")
         await interaction.response.send_message(
             "❌ You have insufficient permissions to run this command.",
             ephemeral=True,
         )
     else:
-        logging.error(f"App command error in {interaction}", exc_info=error)
+        logging.error(f"App command error in {cmd_name}, {interaction}", exc_info=error)
         await interaction.response.send_message(
             "❌ An error occurred while processing your command.",
             ephemeral=True,
@@ -441,6 +442,7 @@ async def send_verify_button(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument(extract_args=["interaction"])
 async def set_verified_role_cmd(interaction: discord.Interaction, role: discord.Role):
     assert interaction.guild is not None
 
