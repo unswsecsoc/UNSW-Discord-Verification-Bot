@@ -52,18 +52,18 @@ def import_csv_to_db(conn, csv_contents: str) -> tuple[bool, str]:
                     f"Validation Error on CSV line {line_num}:\n```{e.json(indent=2)}\n```",
                 )
 
-        cursor = conn.cursor()
-        # Clear existing data
-        cursor.execute("DELETE FROM users")
+        with conn:
+            cursor = conn.cursor()
+            # Clear existing data
+            cursor.execute("DELETE FROM users")
 
-        # Insert new data
-        query = """
-            INSERT INTO users (discord_id, email, verified, verified_at)
-            VALUES (?, ?, ?, ?)
-        """
-        cursor.executemany(query, validated_rows)
+            # Insert new data
+            query = """
+                INSERT INTO users (discord_id, email, verified, verified_at)
+                VALUES (?, ?, ?, ?)
+            """
+            cursor.executemany(query, validated_rows)
 
-        conn.commit()
         return True, f"Success: Imported {len(validated_rows)} rows."
 
     except Exception as e:
