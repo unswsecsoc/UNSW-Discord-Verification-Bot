@@ -20,6 +20,7 @@ from utils import (
     get_guild_dir,
     get_verified_role,
     log_admin,
+    modal_cooldown,
     set_verified_role,
 )
 
@@ -37,6 +38,32 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Active OTP dictionary
 # (guild_id, user_id): {code, expires, last_sent, email}
 pending_verifications = {}
+
+
+@bot.tree.error
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
+    cmd_name = f"/{interaction.command.name}" if interaction.command else "(unknown interaction)"
+    if isinstance(error, app_commands.CommandOnCooldown):
+        retry_after = int(error.retry_after)
+        logging.info(f"Rate limiting {cmd_name} for {interaction.user} for {retry_after} seconds")
+        await interaction.response.send_message(
+            f"⏳ This command is on cooldown. Try again in {retry_after} seconds.",
+            ephemeral=True,
+        )
+    elif isinstance(error, app_commands.MissingPermissions):
+        logging.info(f"Rejecting command {cmd_name} due to insufficient user permissions")
+        await interaction.response.send_message(
+            "❌ You have insufficient permissions to run this command.",
+            ephemeral=True,
+        )
+    else:
+        logging.error(f"App command error in {cmd_name}, {interaction}", exc_info=error)
+        await interaction.response.send_message(
+            "❌ An error occurred while processing your command.",
+            ephemeral=True,
+        )
 
 
 def is_verified(member: discord.Member) -> bool:
@@ -111,6 +138,16 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
     email = discord.ui.TextInput(label="Enter your UNSW email address", required=True)
 
     @logfire.instrument(extract_args=["interaction"])
+    @modal_cooldown(
+        config.RATE_LIMIT_EMAIL_MEMBER_TIMES,
+        config.RATE_LIMIT_EMAIL_MEMBER_SECONDS,
+        lambda interaction: ((interaction.guild and interaction.guild.id), interaction.user.id),
+    )
+    @modal_cooldown(
+        config.RATE_LIMIT_EMAIL_USER_TIMES,
+        config.RATE_LIMIT_EMAIL_USER_SECONDS,
+        lambda interaction: interaction.user.id,
+    )
     async def on_submit(self, interaction: discord.Interaction):
         assert interaction.guild is not None
         assert isinstance(interaction.user, discord.Member)
@@ -142,6 +179,7 @@ class EmailModal(discord.ui.Modal, title="Email Verification"):
 
         user_id = interaction.user.id
         key = (interaction.guild.id, user_id)
+
         record = pending_verifications.get(key)
 
         now = time.time()
@@ -183,12 +221,18 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
     otp = discord.ui.TextInput(label=f"Enter the {config.OTP_LENGTH}-digit code", required=True)
 
     @logfire.instrument(extract_args=["interaction"])
+    @modal_cooldown(
+        config.RATE_LIMIT_OTP_TIMES,
+        config.RATE_LIMIT_OTP_SECONDS,
+        lambda interaction: ((interaction.guild and interaction.guild.id), interaction.user.id),
+    )
     async def on_submit(self, interaction: discord.Interaction):
         assert interaction.guild is not None
         assert isinstance(interaction.user, discord.Member)
 
         user_id = interaction.user.id
         key = (interaction.guild.id, user_id)
+
         record = pending_verifications.get(key)
 
         if not record:
@@ -271,6 +315,16 @@ class VerifyButtonView(discord.ui.View):
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
 @logfire.instrument()
+@app_commands.checks.cooldown(
+    config.RATE_LIMIT_EXPORT_TIMES,
+    config.RATE_LIMIT_EXPORT_SECONDS,
+    key=lambda interaction: interaction.user.id,
+)
+@app_commands.checks.cooldown(
+    config.RATE_LIMIT_EXPORT_TIMES,
+    config.RATE_LIMIT_EXPORT_SECONDS,
+    key=lambda interaction: interaction.guild and interaction.guild.id,
+)
 async def export_db(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
@@ -297,10 +351,27 @@ async def export_db(interaction: discord.Interaction):
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
 @logfire.instrument(extract_args=["interaction"])
+@app_commands.checks.cooldown(
+    config.RATE_LIMIT_IMPORT_TIMES,
+    config.RATE_LIMIT_IMPORT_SECONDS,
+    key=lambda interaction: interaction.user.id,
+)
+@app_commands.checks.cooldown(
+    config.RATE_LIMIT_IMPORT_TIMES,
+    config.RATE_LIMIT_IMPORT_SECONDS,
+    key=lambda interaction: interaction.guild and interaction.guild.id,
+)
 async def import_db(interaction: discord.Interaction, file: discord.Attachment):
     assert interaction.guild is not None
 
     await interaction.response.defer(ephemeral=True)
+
+    if file.size > config.IMPORT_MAX_SIZE_MB * 1024 * 1024:
+        logging.info(f"Rejected file for being too large ({file.size} bytes)")
+        await interaction.followup.send(
+            f"❌ File too large. Maximum size is {config.IMPORT_MAX_SIZE_MB}MB."
+        )
+        return
 
     conn = get_guild_db(interaction.guild)
 
@@ -371,6 +442,7 @@ async def send_verify_button(interaction: discord.Interaction):
 @app_commands.default_permissions(administrator=True)
 @app_commands.checks.has_permissions(administrator=True)
 @app_commands.guild_only()
+@logfire.instrument(extract_args=["interaction"])
 async def set_verified_role_cmd(interaction: discord.Interaction, role: discord.Role):
     assert interaction.guild is not None
 

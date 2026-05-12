@@ -3,15 +3,18 @@ import json
 import logging
 import os
 import sqlite3
-from functools import lru_cache
-from typing import TYPE_CHECKING
+from functools import lru_cache, wraps
+from typing import TYPE_CHECKING, Any
 
 import discord
 import logfire
+from discord.ext import commands
 
 import config
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from discord.app_commands import CommandTree
 
 
@@ -129,3 +132,28 @@ def get_commands_hash(tree: CommandTree) -> str:
         key=lambda c: c["name"],
     )
     return hashlib.md5(json.dumps(commands, sort_keys=True).encode()).hexdigest()
+
+
+def modal_cooldown(times: int, seconds: float, key: Callable[[discord.Interaction], Any]):
+    def decorator(func):
+        _modal_cooldown = commands.CooldownMapping.from_cooldown(times, seconds, key)
+
+        @wraps(func)
+        async def wrapper(self, interaction: discord.Interaction):
+            bucket = _modal_cooldown.get_bucket(interaction)
+            assert bucket is not None
+            retry_after = bucket.update_rate_limit()
+
+            if retry_after is not None:
+                logging.info(f"Rate limiting {interaction.user} for {retry_after} seconds")
+                await interaction.response.send_message(
+                    f"⏳ Too many requests. Try again in {int(retry_after)}s.",
+                    ephemeral=True,
+                )
+                return
+
+            return await func(self, interaction)
+
+        return wrapper
+
+    return decorator
