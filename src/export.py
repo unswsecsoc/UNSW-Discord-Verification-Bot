@@ -52,6 +52,13 @@ def import_csv_to_db(conn, csv_contents: str) -> tuple[bool, str]:
                     f"Validation Error on CSV line {line_num}:\n```{e.json(indent=2)}\n```",
                 )
 
+        user_ids = [row[0] for row in validated_rows]
+        if len(set(user_ids)) != len(user_ids):
+            return (
+                False,
+                "Validation Error: Multiple rows have the same `discord_id`",
+            )
+
         with conn:
             cursor = conn.cursor()
             # Clear existing data
