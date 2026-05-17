@@ -23,6 +23,8 @@ The `verification-logs` channel should only be accessible by a few trusted membe
 The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'. \
 Also, remove all permissions from `@everyone`. They will still be able to use the verification button.
 
+Join the Discord server to receive announcements about upgrades, outages and to get help: [secso.cc/verificationbotdiscord](http://secso.cc/verificationbotdiscord)
+
 ## Backups
 SecSoc does not guarantee the availability of backups for all societies so we reccommend regularly utilising the `/export` (admin only) command and maintain backups for your own society. If issues arise, contact `projects@unswsecurity.com` or for general problems, raise an issue on this GitHub repository.
 
