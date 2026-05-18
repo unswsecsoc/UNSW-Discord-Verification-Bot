@@ -1,3 +1,9 @@
+<div align="center">
+  <img src="images/secsoclogobanner.png" width="500">
+</div>
+
+---
+
 # UNSW Discord Verification Bot
 
 This is a simple and secure email-based verification bot for UNSW students and staff, hosted for free by the UNSW Security Society.
