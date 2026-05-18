@@ -1,4 +1,8 @@
-![SecSoc Logo Banner](images/secsoclogobanner.png)
+<div align="center">
+  <img src="images/secsoclogobanner.png" width="500">
+</div>
+
+---
 
 # UNSW Discord Verification Bot
 
@@ -18,10 +22,11 @@ See images of the verification process in `images` folder.
 Once these steps are complete users will be able to verify by clicking the `Verify Email` button.
 
 ### Important notes:
-The bot user role must be higher in the hierarchy than the `verified` role in server settings. \
-The `verification-logs` channel should only be accessible by a few trusted members of the society's executive team to protect user privacy. \
-The `verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'. \
-Also, remove all permissions from `@everyone`. They will still be able to use the verification button.
+- The bot user role must be higher in the hierarchy than the `verified` role in server settings.
+- The `#verification-logs` channel should only be accessible by a few trusted members of the society's executive team to protect user privacy.
+- The `#verify` channel should be the only channel accessible to an unverified discord user. It doesn't need to be called 'verify'. To do this, remove all permissions from `@everyone` **except `View Channel` and `Read Message History` in `#verify`**. They will still be able to use the verification button.
+- You should get someone to test verification after joining the server (without any roles) to make sure you've set the permissions up correctly!
+- You might want to send a message in `#verify` explaining why people need to verify and what they should do if it isn't working for them.
 
 Join the Discord server to receive announcements about upgrades, outages and to get help: [secso.cc/verificationbotdiscord](http://secso.cc/verificationbotdiscord)
 
