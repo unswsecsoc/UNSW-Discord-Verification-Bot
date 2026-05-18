@@ -12,7 +12,6 @@ ENVIRONMENT=local
 MAILGUN_API_KEY=
 MAILGUN_DOMAIN=yourdomain.com
 MAILGUN_FROM=Verification Bot <verify@yourdomain.com>
-VERIFIED_ROLE_NAME=verified
 
 # Logfire (optional)
 LOGFIRE_TOKEN=
