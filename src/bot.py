@@ -14,6 +14,7 @@ import config
 import logs
 from export import export_db_to_csv, import_csv_to_db
 from otp import generate_otp, match_email, redact_email, send_email_otp, valid_email_domain
+from stats import increment_verification
 from utils import (
     get_commands_hash,
     get_guild_db,
@@ -283,6 +284,8 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
             f"✅ {interaction.user} verified with {redact_email(record['email'])}",
             interaction.guild,
         )
+        if config.GIST_ID and config.GITHUB_TOKEN:
+            await increment_verification()
 
 
 class OTPView(discord.ui.View):

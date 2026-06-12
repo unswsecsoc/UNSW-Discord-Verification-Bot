@@ -6,6 +6,8 @@
 
 # UNSW Discord Verification Bot
 
+![Verified Users](https://img.shields.io/badge/dynamic/json?url=https://gist.githubusercontent.com/secsocbot/6497aa02c3a8b313f04cb2abede84d98/raw/verifications.json&query=$.total&label=verified%20users&color=000000&style=for-the-badge&logo=discord)
+
 This is a simple and secure email-based verification bot for UNSW students and staff, hosted for free by the UNSW Security Society.
 It is designed to be as simple as possible to implement in any UNSW society as quickly as possible.
 See images of the verification process in `images` folder.
