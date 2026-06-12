@@ -10,6 +10,8 @@ MAILGUN_API_KEY = os.environ.get("MAILGUN_API_KEY")
 MAILGUN_DOMAIN = os.environ.get("MAILGUN_DOMAIN")
 MAILGUN_FROM = os.environ.get("MAILGUN_FROM")
 ALLOWED_DOMAINS = [d.strip().lower() for d in os.environ["ALLOWED_EMAIL_DOMAINS"].split(",")]
+GIST_ID = os.environ.get("GITHUB_GIST_ID")
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 
 OTP_EXPIRY_SECONDS = 600
 OTP_RESEND_COOLDOWN = 120
