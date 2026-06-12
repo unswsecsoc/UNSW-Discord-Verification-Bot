@@ -280,12 +280,12 @@ class OTPModal(discord.ui.Modal, title="Enter pin"):
 
         await interaction.response.send_message("✅ Verification successful!", ephemeral=True)
         logging.info(f"verified user {interaction.user}")
-        if config.GIST_ID and config.GITHUB_TOKEN:
-            await increment_verification()
         await log_admin(
             f"✅ {interaction.user} verified with {redact_email(record['email'])}",
             interaction.guild,
         )
+        if config.GIST_ID and config.GITHUB_TOKEN:
+            await increment_verification()
 
 
 class OTPView(discord.ui.View):

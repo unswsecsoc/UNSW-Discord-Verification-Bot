@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -12,6 +13,8 @@ HEADERS = {
     "Authorization": f"Bearer {config.GITHUB_TOKEN}",
     "Accept": "application/vnd.github+json",
 }
+
+_lock = asyncio.Lock()
 
 
 class VerificationStats(BaseModel):
@@ -28,19 +31,23 @@ async def fetch_stats() -> VerificationStats:
 
 
 async def increment_verification() -> None:
-    try:
-        stats = await fetch_stats()
-        updated = VerificationStats(
-            total=stats.total + 1, last_verified=datetime.now(timezone.utc).isoformat()
-        )
-        async with httpx.AsyncClient() as client:
-            await client.patch(
-                GIST_API_URL,
-                headers=HEADERS,
-                json={
-                    "files": {"verifications.json": {"content": updated.model_dump_json(indent=2)}}
-                },
+    async with _lock:
+        try:
+            stats = await fetch_stats()
+            updated = VerificationStats(
+                total=stats.total + 1, last_verified=datetime.now(timezone.utc).isoformat()
             )
-        logging.info("Verification counter updated", extra={"total": updated.total})
-    except Exception as e:
-        logging.error("Failed to update verification gist", extra={"error": str(e)})
+            async with httpx.AsyncClient() as client:
+                await client.patch(
+                    GIST_API_URL,
+                    headers=HEADERS,
+                    json={
+                        "files": {"verifications.json": {
+                            "content": updated.model_dump_json(indent=2)
+                            }
+                        }
+                    },
+                )
+            logging.info("Verification counter updated", extra={"total": updated.total})
+        except Exception as e:
+            logging.error("Failed to update verification gist", extra={"error": str(e)})
